@@ -1,8 +1,6 @@
 package nyvia.rise
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.Service
+import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -17,49 +15,55 @@ class AlarmService : Service() {
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // 1. Opret en notifikation (Kritisk for at Android tillader os at køre i baggrunden)
-        createNotificationChannel()
-        val notification = NotificationCompat.Builder(this, "NyviaRiseChannel")
-            .setContentTitle("NyviaRise Alarm")
-            .setContentText("Stå op og scan QR-koden på badeværelset!")
-            .setSmallIcon(applicationInfo.icon) // Bruger dit app-ikon
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .build()
-        
-        startForeground(1, notification)
+    override fun onBind(intent: Intent?): IBinder? = null
 
-        // 2. Tving skærmen til at tænde (WakeLock)
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // 1. Tving skærmen til at tænde (WakeLock)
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
-            PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
-            "NyviaRise::AlarmWakeLock"
+            PowerManager.FULL_WAKE_LOCK or
+            PowerManager.ACQUIRE_CAUSES_WAKEUP or
+            PowerManager.ON_AFTER_RELEASE,
+            "NyviaRise::WakeLock"
         )
-        wakeLock?.acquire(10 * 60 * 1000L) // Holder skærmen tændt i max 10 minutter
+        wakeLock?.acquire(10 * 60 * 1000L) // Hold den vågen i op til 10 min.
 
-        // 3. Start lyden (Ingen snooze!)
-        mediaPlayer = MediaPlayer()
-        try {
-            // Lige nu bruger vi telefonens standard alarm-lyd. Senere kan vi pege på din egen lydfil.
-            val defaultRingtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            mediaPlayer?.setDataSource(this, defaultRingtoneUri)
-            
-            mediaPlayer?.setAudioAttributes(
+        createNotificationChannel()
+        
+        // 2. FullScreenIntent bryder igennem skærmlåsen og åbner NyviaRise automatisk
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(this, "nyviarise_alarm_channel")
+            .setContentTitle("Tid til at stå op! 🌅")
+            .setContentText("Scan koden for at slukke alarmen.")
+            .setSmallIcon(applicationInfo.icon)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(pendingIntent, true) 
+            .setOngoing(true) // Kan ikke swipes væk
+            .build()
+
+        startForeground(1, notification)
+
+        // 3. Spil lyd på fuld styrke - uanset om telefonen er på lydløs eller "Forstyr ikke"
+        val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+        mediaPlayer = MediaPlayer().apply {
+            setDataSource(this@AlarmService, alarmUri)
+            setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM) // Sørger for at den ignorerer lydløs-tilstand
+                    .setUsage(AudioAttributes.USAGE_ALARM) // Bypasses silent mode!
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build()
             )
-            mediaPlayer?.isLooping = true // Uendeligt loop
-            mediaPlayer?.prepare()
-            mediaPlayer?.start()
-        } catch (e: Exception) {
-            e.printStackTrace()
+            isLooping = true
+            prepare()
+            start()
         }
 
-        // START_STICKY betyder at hvis Android dræber processen pga. manglende RAM, genstarter den med det samme
-        return START_STICKY 
+        return START_STICKY
     }
 
     override fun onDestroy() {
@@ -71,17 +75,17 @@ class AlarmService : Service() {
         }
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
-
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                "NyviaRiseChannel",
+                "nyviarise_alarm_channel",
                 "NyviaRise Alarm",
                 NotificationManager.IMPORTANCE_HIGH
-            )
+            ).apply {
+                setBypassDnd(true) // Går igennem "Forstyr ikke"
+            }
             val manager = getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(channel)
+            manager.createNotificationChannel(channel)
         }
     }
 }
