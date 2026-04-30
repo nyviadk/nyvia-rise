@@ -91,8 +91,6 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
         />
       </View>
 
-      <Button title="Annuller (Kun test)" onPress={onCancel} color="#888" />
-
       {mode === "scan" && (
         <View style={styles.emergencyContainer}>
           <Pressable

@@ -414,7 +414,7 @@ export default function HomeScreen() {
             <DateTimePicker
               value={new Date()}
               mode="time"
-              display="spinner"
+              display="clock"
               is24Hour={true}
               onChange={handleTimeSelected}
             />
