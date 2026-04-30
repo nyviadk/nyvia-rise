@@ -27,10 +27,14 @@ export default function HomeScreen() {
   const [scannerMode, setScannerMode] = useState<"none" | "scan" | "pair">(
     "none",
   );
-  const [showTimePicker, setShowTimePicker] = useState(false);
 
-  // State til at vælge ugedage før man opretter alarmen
+  // Pickers
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [specificDate, setSpecificDate] = useState<Date | null>(null);
+
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
 
@@ -40,6 +44,9 @@ export default function HomeScreen() {
   const toggleAlarm = useAlarmStore((state) => state.toggleAlarm);
   const removeAlarm = useAlarmStore((state) => state.removeAlarm);
   const importAlarms = useAlarmStore((state) => state.importAlarms);
+  const handleAlarmDismissed = useAlarmStore(
+    (state) => state.handleAlarmDismissed,
+  );
 
   useEffect(() => {
     const checkPermissions = async () => {
@@ -52,6 +59,16 @@ export default function HomeScreen() {
     checkPermissions();
   }, []);
 
+  // Håndter når dato vælges
+  const handleDateSelected = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (event.type === "set" && selectedDate) {
+      setSpecificDate(selectedDate);
+      setSelectedDays([]); // Rydder ugedage, da man ikke kan have begge dele
+    }
+  };
+
+  // Håndter når tid vælges
   const handleTimeSelected = (event: any, selectedDate?: Date) => {
     setShowTimePicker(false);
     if (event.type === "set" && selectedDate) {
@@ -63,24 +80,34 @@ export default function HomeScreen() {
         return;
       }
 
-      const triggerTime = calculateNextAlarmTime(selectedDate, selectedDays);
+      const triggerTime = calculateNextAlarmTime(
+        selectedDate,
+        selectedDays,
+        specificDate,
+      );
+
       addAlarm({
         id: Date.now().toString(),
         time: triggerTime,
         isActive: true,
         days: selectedDays,
+        specificDate: specificDate ? specificDate.toISOString() : null,
       });
 
       Alert.alert(
-        "Alarm aktiveret 🌅",
+        "Alarm gemt 🌅",
         `Planlagt til om ${getTimeRemainingText(triggerTime)}`,
       );
-      setSelectedDays([]); // Nulstil valgte dage
+
+      // Nulstil valg
+      setSelectedDays([]);
+      setSpecificDate(null);
     }
   };
 
   const stopAlarm = () => {
     NyviaRiseModule.stopAlarm();
+    handleAlarmDismissed(); // Fortæller Zustand at rulle gentagende alarmer frem!
     setScannerMode("none");
   };
 
@@ -104,10 +131,7 @@ export default function HomeScreen() {
         Alert.alert("Fejl", "Ugyldigt backup format.");
       }
     } catch (e) {
-      Alert.alert(
-        "Fejl",
-        "Kunne ikke læse data. Er du sikker på det er en gyldig backup?",
-      );
+      Alert.alert("Fejl", "Kunne ikke læse data.");
     }
   };
 
@@ -116,6 +140,7 @@ export default function HomeScreen() {
       setSelectedDays(selectedDays.filter((d) => d !== dayIndex));
     } else {
       setSelectedDays([...selectedDays, dayIndex]);
+      setSpecificDate(null); // Rydder kalenderdato, hvis man klikker på ugedage
     }
   };
 
@@ -159,9 +184,19 @@ export default function HomeScreen() {
                     minute: "2-digit",
                   })}
                 </ThemedText>
-                {alarm.days.length > 0 && (
+
+                {alarm.specificDate ? (
+                  <ThemedText style={{ fontSize: 12, color: "#2196F3" }}>
+                    Dato:{" "}
+                    {new Date(alarm.specificDate).toLocaleDateString("da-DK")}
+                  </ThemedText>
+                ) : alarm.days.length > 0 ? (
                   <ThemedText style={{ fontSize: 12, color: "#666" }}>
                     Gentages: {alarm.days.map((d) => dayNames[d]).join(", ")}
+                  </ThemedText>
+                ) : (
+                  <ThemedText style={{ fontSize: 12, color: "#666" }}>
+                    Engangsalarm
                   </ThemedText>
                 )}
               </View>
@@ -188,26 +223,50 @@ export default function HomeScreen() {
         </View>
 
         <ThemedText style={{ marginTop: 20, marginBottom: 10 }}>
-          Opret ny alarm (Vælg evt. dage):
+          1. Vælg dage (Valgfrit):
         </ThemedText>
         <View style={styles.daysContainer}>
-          {[1, 2, 3, 4, 5, 6, 0].map(
-            (
-              day, // Mandag til Søndag layout
-            ) => (
+          {[1, 2, 3, 4, 5, 6, 0].map((day) => (
+            <Button
+              key={day}
+              title={dayNames[day]}
+              color={selectedDays.includes(day) ? "#4CAF50" : "#ccc"}
+              onPress={() => toggleDay(day)}
+            />
+          ))}
+        </View>
+
+        <View
+          style={{ marginVertical: 10, width: "100%", alignItems: "center" }}
+        >
+          <ThemedText style={{ marginBottom: 10 }}>
+            ...eller vælg en specifik kalenderdato:
+          </ThemedText>
+          {specificDate ? (
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+            >
+              <ThemedText style={{ color: "#2196F3", fontWeight: "bold" }}>
+                {specificDate.toLocaleDateString("da-DK")}
+              </ThemedText>
               <Button
-                key={day}
-                title={dayNames[day]}
-                color={selectedDays.includes(day) ? "#4CAF50" : "#ccc"}
-                onPress={() => toggleDay(day)}
+                title="Ryd"
+                color="#F44336"
+                onPress={() => setSpecificDate(null)}
               />
-            ),
+            </View>
+          ) : (
+            <Button
+              title="Åbn Kalender"
+              color="#888"
+              onPress={() => setShowDatePicker(true)}
+            />
           )}
         </View>
 
-        <View style={styles.buttonContainer}>
+        <View style={[styles.buttonContainer, { marginTop: 20 }]}>
           <Button
-            title="+ VÆLG TID & GEM ALARM"
+            title="2. VÆLG TID & GEM ALARM"
             onPress={() => setShowTimePicker(true)}
             color="#4CAF50"
           />
@@ -230,13 +289,9 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.backupContainer}>
+          <Button title="Eksportér" onPress={handleExportBackup} color="#888" />
           <Button
-            title="Eksportér Backup"
-            onPress={handleExportBackup}
-            color="#888"
-          />
-          <Button
-            title="Importér Backup"
+            title="Importér"
             onPress={() => setShowImport(!showImport)}
             color="#888"
           />
@@ -246,13 +301,22 @@ export default function HomeScreen() {
           <View style={styles.importBox}>
             <TextInput
               style={styles.input}
-              placeholder="Indsæt backup tekst her..."
+              placeholder="Indsæt backup..."
               value={importText}
               onChangeText={setImportText}
               multiline
             />
             <Button title="Gennemfør Import" onPress={handleImportBackup} />
           </View>
+        )}
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={specificDate || new Date()}
+            mode="date"
+            display="default"
+            onChange={handleDateSelected}
+          />
         )}
 
         {showTimePicker && (

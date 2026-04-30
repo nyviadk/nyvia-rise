@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage, StateStorage } from "zustand/middleware";
 import { createMMKV } from "react-native-mmkv";
 import NyviaRiseModule from "@/modules/nyvia-rise";
+import { calculateNextAlarmTime } from "@/src/utils/time-helpers";
 
 const mmkv = createMMKV({ id: "nyviarise-alarms" });
 
@@ -15,7 +16,8 @@ export interface Alarm {
   id: string;
   time: number; // Unix timestamp for næste ringning
   isActive: boolean;
-  days: number[]; // [1,2,3,4,5] for hverdage. Tomt = engangsalarm.
+  days: number[]; // [0-6] for ugedage
+  specificDate?: string | null; // Gemmes som ISO string, hvis en specifik kalenderdag er valgt
 }
 
 interface AlarmState {
@@ -27,6 +29,7 @@ interface AlarmState {
   toggleAlarm: (id: string) => void;
   importAlarms: (importedAlarms: Alarm[]) => void;
   syncWithAndroid: () => void;
+  handleAlarmDismissed: () => void;
 }
 
 export const useAlarmStore = create<AlarmState>()(
@@ -37,9 +40,42 @@ export const useAlarmStore = create<AlarmState>()(
 
       setSecretQrCode: (code) => set({ secretQrCode: code }),
 
-      addAlarm: (alarm) => {
-        set((state) => ({ alarms: [...state.alarms, alarm] }));
-        get().syncWithAndroid();
+      addAlarm: (newAlarm) => {
+        const { alarms, toggleAlarm, syncWithAndroid } = get();
+
+        // Tjek for duplikater: Matcher time, minut, ugedage og evt. specifik dato?
+        const newDate = new Date(newAlarm.time);
+
+        const existing = alarms.find((a) => {
+          const aDate = new Date(a.time);
+          const sameTime =
+            aDate.getHours() === newDate.getHours() &&
+            aDate.getMinutes() === newDate.getMinutes();
+          const sameDays =
+            JSON.stringify([...a.days].sort()) ===
+            JSON.stringify([...newAlarm.days].sort());
+          const sameSpecific = a.specificDate === newAlarm.specificDate;
+          return sameTime && sameDays && sameSpecific;
+        });
+
+        if (existing) {
+          if (!existing.isActive) {
+            // Findes allerede, men er slukket. Tænd den og opdater dens tid!
+            set((state) => ({
+              alarms: state.alarms.map((a) =>
+                a.id === existing.id
+                  ? { ...a, isActive: true, time: newAlarm.time }
+                  : a,
+              ),
+            }));
+            syncWithAndroid();
+          }
+          return; // Gør intet, hvis den allerede findes og er tændt
+        }
+
+        // Ellers opret en ny
+        set((state) => ({ alarms: [...state.alarms, newAlarm] }));
+        syncWithAndroid();
       },
 
       removeAlarm: (id) => {
@@ -59,6 +95,46 @@ export const useAlarmStore = create<AlarmState>()(
       importAlarms: (importedAlarms) => {
         set({ alarms: importedAlarms });
         get().syncWithAndroid();
+      },
+
+      // KØRER NÅR DU HAR SCANNKET KODEN
+      handleAlarmDismissed: () => {
+        const { alarms, toggleAlarm, syncWithAndroid } = get();
+
+        // Finder den alarm der lige har ringet (den aktive alarm med den ældste tid)
+        const activeAlarms = alarms
+          .filter((a) => a.isActive)
+          .sort((a, b) => a.time - b.time);
+
+        if (activeAlarms.length > 0) {
+          const ringingAlarm = activeAlarms[0];
+
+          if (ringingAlarm.days.length > 0) {
+            // GENTAGENDE ALARM: Udregn næste ugedag og skub alarmen, behold den aktiv
+            const baseDate = new Date();
+            baseDate.setHours(
+              new Date(ringingAlarm.time).getHours(),
+              new Date(ringingAlarm.time).getMinutes(),
+              0,
+              0,
+            );
+
+            const nextTime = calculateNextAlarmTime(
+              baseDate,
+              ringingAlarm.days,
+            );
+
+            set((state) => ({
+              alarms: state.alarms.map((a) =>
+                a.id === ringingAlarm.id ? { ...a, time: nextTime } : a,
+              ),
+            }));
+          } else {
+            // ENGANGS ALARM ELLER SPECIFIK DATO: Slå den fra
+            toggleAlarm(ringingAlarm.id);
+          }
+          syncWithAndroid();
+        }
       },
 
       syncWithAndroid: () => {

@@ -9,34 +9,45 @@ import {
 } from "date-fns";
 
 export const calculateNextAlarmTime = (
-  selectedDate: Date,
+  selectedTime: Date,
   activeDays: number[] = [],
+  specificDate?: Date | null,
 ): number => {
   const now = new Date();
 
+  // 1. Start med dags dato, og overskriv timer/minutter med det valgte tidspunkt
   let alarmTime = set(now, {
-    hours: selectedDate.getHours(),
-    minutes: selectedDate.getMinutes(),
+    hours: selectedTime.getHours(),
+    minutes: selectedTime.getMinutes(),
     seconds: 0,
     milliseconds: 0,
   });
 
-  if (activeDays.length === 0) {
-    // Standard: Hvis ingen dage er valgt, skub til i morgen hvis tiden er gået i dag
+  if (specificDate) {
+    // 2a. Hvis du har valgt en fast dato i kalenderen
+    alarmTime = set(alarmTime, {
+      year: specificDate.getFullYear(),
+      month: specificDate.getMonth(),
+      date: specificDate.getDate(),
+    });
+  } else if (activeDays.length === 0) {
+    // 2b. Engangsalarm (Hverken ugedage eller fast dato valgt)
     if (isBefore(alarmTime, now)) {
       alarmTime = addDays(alarmTime, 1);
     }
   } else {
-    // Ugedage: Find den næste dag, der er aktiv
-    if (isBefore(alarmTime, now)) {
+    // 2c. Gentagende alarm (Ugedage)
+    // Hvis tidspunktet allerede er passeret i dag, ELLER hvis i dag ikke er en valgt dag
+    if (isBefore(alarmTime, now) || !activeDays.includes(getDay(alarmTime))) {
       alarmTime = addDays(alarmTime, 1);
-    }
-    // Løb fremad i kalenderen indtil vi rammer en valgt ugedag (0 = Søndag, 1 = Mandag osv.)
-    while (!activeDays.includes(getDay(alarmTime))) {
-      alarmTime = addDays(alarmTime, 1);
+      // Fortsæt med at lægge en dag til, indtil vi rammer en valgt ugedag
+      while (!activeDays.includes(getDay(alarmTime))) {
+        alarmTime = addDays(alarmTime, 1);
+      }
     }
   }
 
+  // getTime() genererer det korrekte Unix timestamp uanset dansk sommer/vintertid
   return alarmTime.getTime();
 };
 
