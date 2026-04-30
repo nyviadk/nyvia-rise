@@ -1,5 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
-import { StyleSheet, View, Pressable, Text, Button } from "react-native";
+import {
+  StyleSheet,
+  View,
+  Pressable,
+  Text,
+  Button,
+  Animated,
+} from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import Toast from "react-native-toast-message";
 import { ThemedView } from "@/components/themed-view";
@@ -16,52 +23,74 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
-  // States til nødstop
-  const [isHolding, setIsHolding] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(8);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // States til Tap-nødstop
+  const [tapCount, setTapCount] = useState(0);
+  const tapsRequired = 20; // Antal tryk krævet
+  const tapResetTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Animation til progress bar
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   const secretQrCodes = useAlarmStore((state) => state.secretQrCodes);
   const addSecretQrCode = useAlarmStore((state) => state.addSecretQrCode);
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
     };
   }, []);
 
-  const handlePressIn = () => {
-    setIsHolding(true);
-    setSecondsLeft(8);
+  // Animer progress baren når tapCount ændrer sig
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: tapCount / tapsRequired,
+      duration: 100, // Hurtig og snappy animation
+      useNativeDriver: false, // color/width kan ikke bruge native driver fuldt ud i alle versioner
+    }).start();
+  }, [tapCount]);
 
-    timerRef.current = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          setTimeout(() => {
-            Toast.show({
-              type: "error",
-              text1: "NØDSTOP 🚨",
-              text2: "Alarmen blev tvangsslukket.",
-            });
-            onSuccess();
-          }, 0);
-          return 0;
-        }
-        return prev - 1;
+  const executeEmergencyStop = () => {
+    if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
+    setTapCount(0);
+    progressAnim.setValue(0);
+
+    setTimeout(() => {
+      Toast.show({
+        type: "error",
+        text1: "NØDSTOP 🚨",
+        text2: "Alarm slukket via panic taps.",
       });
-    }, 1000);
+      onSuccess();
+    }, 0);
   };
 
-  const handlePressOut = () => {
-    setIsHolding(false);
-    setSecondsLeft(8);
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+  const handlePanicTap = () => {
+    setTapCount((prev) => {
+      const newCount = prev + 1;
+
+      if (newCount >= tapsRequired) {
+        executeEmergencyStop();
+        return 0; // Vi er færdige
+      }
+      return newCount;
+    });
+
+    // Nulstil tap-tælleren NÅDESLØST hvis der går mere end 0.5 sekund mellem tryk.
+    // Du kan ikke "vågn-tappe" en gang, sove lidt, og tappe igen.
+    if (tapResetTimerRef.current) {
+      clearTimeout(tapResetTimerRef.current);
     }
+
+    tapResetTimerRef.current = setTimeout(() => {
+      setTapCount(0);
+      Toast.show({
+        type: "info",
+        text1: "For langsom!",
+        text2: "Du skal tappe uafbrudt.",
+        visibilityTime: 1500,
+        position: "bottom",
+      });
+    }, 500); // 0.5 sekunds frist!
   };
 
   if (!permission)
@@ -115,24 +144,27 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
     }
   };
 
+  // Beregn bredden af progressbaren
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  });
+
+  // Skift farven fra gul til rød jo tættere man er på at slukke den
+  const progressColor = progressAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: ["#FFC107", "#FF9800", "#F44336"],
+  });
+
   return (
     <ThemedView style={styles.container}>
-      {/* STOR NEDTÆLLING I TOPPEN */}
-      <View style={styles.countdownContainer}>
-        {isHolding ? (
-          <Text style={styles.countdownNumber}>{secondsLeft}</Text>
-        ) : (
-          <Text style={styles.countdownPlaceholder}> </Text>
-        )}
-      </View>
-
       <ThemedText type="title" style={styles.title}>
         {mode === "pair" ? "Tilføj ny kode 🔗" : "Tid til at stå op! 🚨"}
       </ThemedText>
       <ThemedText type="subtitle" style={styles.subtitle}>
         {mode === "pair"
           ? "Scan den kode du vil tilføje."
-          : "Scan en af dine godkendte koder for at slukke."}
+          : "Scan en godkendt kode, ELLER brug nødstop."}
       </ThemedText>
 
       <View style={styles.cameraContainer}>
@@ -146,16 +178,34 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
 
       {mode === "scan" && (
         <View style={styles.emergencyContainer}>
+          <ThemedText style={{ color: "#888", marginBottom: 10 }}>
+            {tapCount > 0
+              ? `Manglende tryk: ${tapsRequired - tapCount}`
+              : "NØDSTOP:"}
+          </ThemedText>
+
           <Pressable
-            style={[
+            style={({ pressed }) => [
               styles.emergencyButton,
-              isHolding && styles.emergencyButtonPressed,
+              pressed && styles.emergencyButtonPressed,
             ]}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
+            onPress={handlePanicTap}
           >
+            {/* Progress Bar der fyldes op i baggrunden af knappen */}
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  backgroundColor: progressColor,
+                  width: progressWidth,
+                  borderRadius: 15, // Matcher knappens kant
+                  opacity: 0.3, // Gør den subtil så teksten stadig kan læses
+                },
+              ]}
+            />
+
             <Text style={styles.emergencyText}>
-              {isHolding ? "SLIP FOR AT ANNULLERE" : "Hold inde for nødstop"}
+              {tapCount > 0 ? "BLIV VED!" : `TAP HURTIGT ${tapsRequired} GANGE`}
             </Text>
           </Pressable>
         </View>
@@ -184,22 +234,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
-  // NYT: Styling til den store nedtælling
-  countdownContainer: {
-    height: 100, // Reserverer plads så indholdet ikke hopper
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  countdownNumber: {
-    fontSize: 80,
-    fontWeight: "bold",
-    color: "#F44336", // Rød farve der signalerer alarm/stop
-  },
-  countdownPlaceholder: {
-    fontSize: 80, // Samme størrelse for at holde layoutet stabilt
-  },
-  title: { color: "#fff", marginBottom: 10, textAlign: "center" },
+  title: { color: "#fff", marginBottom: 10, textAlign: "center", fontSize: 28 },
   subtitle: { color: "#ccc", marginBottom: 30, textAlign: "center" },
   warningText: { textAlign: "center", marginBottom: 20 },
   cameraContainer: {
@@ -211,24 +246,32 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "#2196F3",
   },
-  emergencyContainer: { marginTop: 40 },
+  emergencyContainer: {
+    marginTop: 10,
+    width: "100%",
+    alignItems: "center",
+  },
   emergencyButton: {
-    backgroundColor: "#333",
-    paddingVertical: 20, // Gjort knappen lidt større
-    paddingHorizontal: 40,
-    borderRadius: 15, // Blødere kanter
+    backgroundColor: "#222",
+    paddingVertical: 25,
+    paddingHorizontal: 20,
+    borderRadius: 15,
     borderWidth: 2,
-    borderColor: "#555",
-    minWidth: 250,
+    borderColor: "#444",
+    width: "80%", // Fast bredde så den er nem at ramme
+    overflow: "hidden", // Sikrer at progressbaren bliver inde i knappen
+    position: "relative", // Nødvendig for absolute progress bar
+    justifyContent: "center",
+    alignItems: "center",
   },
   emergencyButtonPressed: {
-    backgroundColor: "#D32F2F", // Mørkerød når den holdes nede
-    borderColor: "#FF5252",
+    backgroundColor: "#333",
   },
   emergencyText: {
     color: "#fff",
     fontWeight: "bold",
     textAlign: "center",
-    fontSize: 16, // Lidt større tekst
+    fontSize: 18,
+    zIndex: 10, // Sikrer at teksten er ovenpå progressbaren
   },
 });
