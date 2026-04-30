@@ -1,4 +1,4 @@
-package nyvia.rise
+package nyvia.rise.module
 
 import android.content.Context
 import android.webkit.WebView

@@ -1,4 +1,4 @@
-package nyvia.rise
+package nyvia.rise.module
 
 import android.app.*
 import android.content.Context

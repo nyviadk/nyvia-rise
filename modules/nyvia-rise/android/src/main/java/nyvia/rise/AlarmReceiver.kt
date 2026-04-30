@@ -1,4 +1,4 @@
-package nyvia.rise
+package nyvia.rise.module
 
 import android.content.BroadcastReceiver
 import android.content.Context
