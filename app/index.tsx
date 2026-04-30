@@ -4,7 +4,6 @@ import {
   Button,
   StyleSheet,
   Switch,
-  Alert,
   Platform,
   PermissionsAndroid,
   Share,
@@ -12,6 +11,7 @@ import {
   ScrollView,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import Toast from "react-native-toast-message";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -68,10 +68,12 @@ export default function HomeScreen() {
     setShowTimePicker(false);
     if (event.type === "set" && selectedDate) {
       if (secretQrCodes.length === 0) {
-        Alert.alert(
-          "Hov!",
-          "Du skal tilføje mindst én stregkode, før du kan sætte en alarm.",
-        );
+        Toast.show({
+          type: "error",
+          text1: "Hov!",
+          text2:
+            "Du skal tilføje mindst én stregkode, før du kan sætte en alarm.",
+        });
         return;
       }
 
@@ -89,10 +91,11 @@ export default function HomeScreen() {
         specificDate: specificDate ? specificDate.toISOString() : null,
       });
 
-      Alert.alert(
-        "Alarm gemt 🌅",
-        `Planlagt til om ${getTimeRemainingText(triggerTime)}`,
-      );
+      Toast.show({
+        type: "success",
+        text1: "Alarm gemt 🌅",
+        text2: `Planlagt til om ${getTimeRemainingText(triggerTime)}`,
+      });
 
       setSelectedDays([]);
       setSpecificDate(null);
@@ -109,7 +112,11 @@ export default function HomeScreen() {
     try {
       await Share.share({ message: JSON.stringify(alarms) });
     } catch (error) {
-      Alert.alert("Fejl", "Kunne ikke eksportere backup.");
+      Toast.show({
+        type: "error",
+        text1: "Fejl",
+        text2: "Kunne ikke eksportere backup.",
+      });
     }
   };
 
@@ -118,14 +125,26 @@ export default function HomeScreen() {
       const parsed = JSON.parse(importText);
       if (Array.isArray(parsed)) {
         importAlarms(parsed);
-        Alert.alert("Succes", "Alarmer importeret!");
+        Toast.show({
+          type: "success",
+          text1: "Succes",
+          text2: "Alarmer importeret!",
+        });
         setShowImport(false);
         setImportText("");
       } else {
-        Alert.alert("Fejl", "Ugyldigt backup format.");
+        Toast.show({
+          type: "error",
+          text1: "Fejl",
+          text2: "Ugyldigt backup format.",
+        });
       }
     } catch (e) {
-      Alert.alert("Fejl", "Kunne ikke læse data.");
+      Toast.show({
+        type: "error",
+        text1: "Fejl",
+        text2: "Kunne ikke læse data.",
+      });
     }
   };
 
@@ -140,205 +159,219 @@ export default function HomeScreen() {
 
   if (scannerMode !== "none") {
     return (
-      <QRScanner
-        mode={scannerMode}
-        onSuccess={stopAlarm}
-        onCancel={() => setScannerMode("none")}
-      />
+      <>
+        <QRScanner
+          mode={scannerMode}
+          onSuccess={stopAlarm}
+          onCancel={() => setScannerMode("none")}
+        />
+        <Toast />
+      </>
     );
   }
 
   const dayNames = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"];
 
+  // Vi pakker ScrollView ind i et Fragment (<>) for at kunne lægge Toast i bunden
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <ThemedView style={styles.container}>
-        <ThemedText type="title" style={styles.titleSpacing}>
-          NyviaRise 🌅
-        </ThemedText>
-
-        {/* -- START: HÅNDTERING AF KODER -- */}
-        <View style={styles.card}>
-          <ThemedText type="subtitle">
-            Godkendte Koder ({secretQrCodes.length})
+    <>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ThemedView style={styles.container}>
+          <ThemedText type="title" style={styles.titleSpacing}>
+            NyviaRise 🌅
           </ThemedText>
-          {secretQrCodes.length === 0 ? (
-            <ThemedText style={{ color: "red", marginTop: 10 }}>
-              ⚠️ Ingen stregkode parret!
+
+          <View style={styles.card}>
+            <ThemedText type="subtitle">
+              Godkendte Koder ({secretQrCodes.length})
             </ThemedText>
-          ) : (
-            secretQrCodes.map((code) => (
-              <View key={code} style={styles.codeItem}>
-                <ThemedText style={{ flex: 1 }} numberOfLines={1}>
-                  *{code.slice(-6)}
-                </ThemedText>
-                <Button
-                  title="Fjern"
-                  color="#F44336"
-                  onPress={() => removeSecretQrCode(code)}
-                />
-              </View>
-            ))
-          )}
-          <View style={{ marginTop: 10 }}>
-            <Button
-              title="+ TILFØJ NY KODE"
-              onPress={() => setScannerMode("pair")}
-              color="#2196F3"
-            />
-          </View>
-        </View>
-        {/* -- SLUT: HÅNDTERING AF KODER -- */}
-
-        <View style={styles.card}>
-          <ThemedText type="subtitle">Dine Alarmer:</ThemedText>
-          {alarms.map((alarm) => (
-            <View key={alarm.id} style={styles.alarmItem}>
-              <View>
-                <ThemedText type="title">
-                  {new Date(alarm.time).toLocaleTimeString("da-DK", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </ThemedText>
-
-                {alarm.specificDate ? (
-                  <ThemedText style={{ fontSize: 12, color: "#2196F3" }}>
-                    Dato:{" "}
-                    {new Date(alarm.specificDate).toLocaleDateString("da-DK")}
-                  </ThemedText>
-                ) : alarm.days.length > 0 ? (
-                  <ThemedText style={{ fontSize: 12, color: "#666" }}>
-                    Gentages: {alarm.days.map((d) => dayNames[d]).join(", ")}
-                  </ThemedText>
-                ) : (
-                  <ThemedText style={{ fontSize: 12, color: "#666" }}>
-                    Engangsalarm
-                  </ThemedText>
-                )}
-              </View>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 15 }}
-              >
-                <Switch
-                  value={alarm.isActive}
-                  onValueChange={() => toggleAlarm(alarm.id)}
-                />
-                <Button
-                  title="Slet"
-                  color="#F44336"
-                  onPress={() => removeAlarm(alarm.id)}
-                />
-              </View>
-            </View>
-          ))}
-          {alarms.length === 0 && (
-            <ThemedText style={{ marginTop: 10, color: "#999" }}>
-              Ingen alarmer sat op.
-            </ThemedText>
-          )}
-        </View>
-
-        <ThemedText style={{ marginTop: 20, marginBottom: 10 }}>
-          1. Vælg dage (Valgfrit):
-        </ThemedText>
-        <View style={styles.daysContainer}>
-          {[1, 2, 3, 4, 5, 6, 0].map((day) => (
-            <Button
-              key={day}
-              title={dayNames[day]}
-              color={selectedDays.includes(day) ? "#4CAF50" : "#ccc"}
-              onPress={() => toggleDay(day)}
-            />
-          ))}
-        </View>
-
-        <View
-          style={{ marginVertical: 10, width: "100%", alignItems: "center" }}
-        >
-          <ThemedText style={{ marginBottom: 10 }}>
-            ...eller vælg en specifik kalenderdato:
-          </ThemedText>
-          {specificDate ? (
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-            >
-              <ThemedText style={{ color: "#2196F3", fontWeight: "bold" }}>
-                {specificDate.toLocaleDateString("da-DK")}
+            {secretQrCodes.length === 0 ? (
+              <ThemedText style={{ color: "red", marginTop: 10 }}>
+                ⚠️ Ingen stregkode parret!
               </ThemedText>
+            ) : (
+              secretQrCodes.map((code) => (
+                <View key={code} style={styles.codeItem}>
+                  <ThemedText style={{ flex: 1 }} numberOfLines={1}>
+                    *{code.slice(-6)}
+                  </ThemedText>
+                  <Button
+                    title="Fjern"
+                    color="#F44336"
+                    onPress={() => removeSecretQrCode(code)}
+                  />
+                </View>
+              ))
+            )}
+            <View style={{ marginTop: 10 }}>
               <Button
-                title="Ryd"
-                color="#F44336"
-                onPress={() => setSpecificDate(null)}
+                title="+ TILFØJ NY KODE"
+                onPress={() => setScannerMode("pair")}
+                color="#2196F3"
               />
             </View>
-          ) : (
+          </View>
+
+          <View style={styles.card}>
+            <ThemedText type="subtitle">Dine Alarmer:</ThemedText>
+            {alarms.map((alarm) => (
+              <View key={alarm.id} style={styles.alarmItem}>
+                <View>
+                  <ThemedText type="title">
+                    {new Date(alarm.time).toLocaleTimeString("da-DK", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </ThemedText>
+
+                  {alarm.specificDate ? (
+                    <ThemedText style={{ fontSize: 12, color: "#2196F3" }}>
+                      Dato:{" "}
+                      {new Date(alarm.specificDate).toLocaleDateString("da-DK")}
+                    </ThemedText>
+                  ) : alarm.days.length > 0 ? (
+                    <ThemedText style={{ fontSize: 12, color: "#666" }}>
+                      Gentages: {alarm.days.map((d) => dayNames[d]).join(", ")}
+                    </ThemedText>
+                  ) : (
+                    <ThemedText style={{ fontSize: 12, color: "#666" }}>
+                      Engangsalarm
+                    </ThemedText>
+                  )}
+                </View>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 15,
+                  }}
+                >
+                  <Switch
+                    value={alarm.isActive}
+                    onValueChange={() => toggleAlarm(alarm.id)}
+                  />
+                  <Button
+                    title="Slet"
+                    color="#F44336"
+                    onPress={() => removeAlarm(alarm.id)}
+                  />
+                </View>
+              </View>
+            ))}
+            {alarms.length === 0 && (
+              <ThemedText style={{ marginTop: 10, color: "#999" }}>
+                Ingen alarmer sat op.
+              </ThemedText>
+            )}
+          </View>
+
+          <ThemedText style={{ marginTop: 20, marginBottom: 10 }}>
+            1. Vælg dage (Valgfrit):
+          </ThemedText>
+          <View style={styles.daysContainer}>
+            {[1, 2, 3, 4, 5, 6, 0].map((day) => (
+              <Button
+                key={day}
+                title={dayNames[day]}
+                color={selectedDays.includes(day) ? "#4CAF50" : "#ccc"}
+                onPress={() => toggleDay(day)}
+              />
+            ))}
+          </View>
+
+          <View
+            style={{ marginVertical: 10, width: "100%", alignItems: "center" }}
+          >
+            <ThemedText style={{ marginBottom: 10 }}>
+              ...eller vælg en specifik kalenderdato:
+            </ThemedText>
+            {specificDate ? (
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                <ThemedText style={{ color: "#2196F3", fontWeight: "bold" }}>
+                  {specificDate.toLocaleDateString("da-DK")}
+                </ThemedText>
+                <Button
+                  title="Ryd"
+                  color="#F44336"
+                  onPress={() => setSpecificDate(null)}
+                />
+              </View>
+            ) : (
+              <Button
+                title="Åbn Kalender"
+                color="#888"
+                onPress={() => setShowDatePicker(true)}
+              />
+            )}
+          </View>
+
+          <View style={[styles.buttonContainer, { marginTop: 20 }]}>
             <Button
-              title="Åbn Kalender"
+              title="2. VÆLG TID & GEM ALARM"
+              onPress={() => setShowTimePicker(true)}
+              color="#4CAF50"
+            />
+          </View>
+
+          <View style={[styles.buttonContainer, { marginTop: 40 }]}>
+            <Button
+              title="🚨 TEST QR SCANNER"
+              onPress={() => setScannerMode("scan")}
+              color="#FF9800"
+            />
+          </View>
+
+          <View style={styles.backupContainer}>
+            <Button
+              title="Eksportér"
+              onPress={handleExportBackup}
               color="#888"
-              onPress={() => setShowDatePicker(true)}
+            />
+            <Button
+              title="Importér"
+              onPress={() => setShowImport(!showImport)}
+              color="#888"
+            />
+          </View>
+
+          {showImport && (
+            <View style={styles.importBox}>
+              <TextInput
+                style={styles.input}
+                placeholder="Indsæt backup..."
+                value={importText}
+                onChangeText={setImportText}
+                multiline
+              />
+              <Button title="Gennemfør Import" onPress={handleImportBackup} />
+            </View>
+          )}
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={specificDate || new Date()}
+              mode="date"
+              display="default"
+              onChange={handleDateSelected}
             />
           )}
-        </View>
 
-        <View style={[styles.buttonContainer, { marginTop: 20 }]}>
-          <Button
-            title="2. VÆLG TID & GEM ALARM"
-            onPress={() => setShowTimePicker(true)}
-            color="#4CAF50"
-          />
-        </View>
-
-        <View style={[styles.buttonContainer, { marginTop: 40 }]}>
-          <Button
-            title="🚨 TEST QR SCANNER"
-            onPress={() => setScannerMode("scan")}
-            color="#FF9800"
-          />
-        </View>
-
-        <View style={styles.backupContainer}>
-          <Button title="Eksportér" onPress={handleExportBackup} color="#888" />
-          <Button
-            title="Importér"
-            onPress={() => setShowImport(!showImport)}
-            color="#888"
-          />
-        </View>
-
-        {showImport && (
-          <View style={styles.importBox}>
-            <TextInput
-              style={styles.input}
-              placeholder="Indsæt backup..."
-              value={importText}
-              onChangeText={setImportText}
-              multiline
+          {showTimePicker && (
+            <DateTimePicker
+              value={new Date()}
+              mode="time"
+              display="spinner"
+              is24Hour={true}
+              onChange={handleTimeSelected}
             />
-            <Button title="Gennemfør Import" onPress={handleImportBackup} />
-          </View>
-        )}
+          )}
+        </ThemedView>
+      </ScrollView>
 
-        {showDatePicker && (
-          <DateTimePicker
-            value={specificDate || new Date()}
-            mode="date"
-            display="default"
-            onChange={handleDateSelected}
-          />
-        )}
-
-        {showTimePicker && (
-          <DateTimePicker
-            value={new Date()}
-            mode="time"
-            display="spinner"
-            is24Hour={true}
-            onChange={handleTimeSelected}
-          />
-        )}
-      </ThemedView>
-    </ScrollView>
+      <Toast />
+    </>
   );
 }
 

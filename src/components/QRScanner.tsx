@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { StyleSheet, View, Alert, Pressable, Text, Button } from "react-native";
+import { StyleSheet, View, Pressable, Text, Button } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import Toast from "react-native-toast-message"; // NYT: Importerer Toast her også!
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { useAlarmStore } from "@/src/store/useAlarmStore";
@@ -40,14 +41,19 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
 
     if (mode === "pair") {
       if (secretQrCodes.includes(data)) {
-        Alert.alert(
-          "Allerede parret",
-          "Denne stregkode findes allerede på din liste.",
-        );
+        Toast.show({
+          type: "info",
+          text1: "Allerede parret",
+          text2: "Denne stregkode findes allerede på din liste.",
+        });
         setTimeout(() => setScanned(false), 2000);
       } else {
         addSecretQrCode(data);
-        Alert.alert("Succes!", "Din nye kode er tilføjet.");
+        Toast.show({
+          type: "success",
+          text1: "Succes! 🔗",
+          text2: "Din nye kode er tilføjet.",
+        });
         onSuccess();
       }
     } else {
@@ -55,10 +61,11 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
       if (secretQrCodes.includes(data)) {
         onSuccess();
       } else {
-        Alert.alert(
-          "Forkert stregkode!",
-          "Dette er ikke en af dine parrede koder. Prøv igen.",
-        );
+        Toast.show({
+          type: "error",
+          text1: "Forkert stregkode! ❌",
+          text2: "Dette er ikke en af dine parrede koder. Prøv igen.",
+        });
         setTimeout(() => setScanned(false), 2000);
       }
     }
@@ -95,7 +102,11 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
             ]}
             delayLongPress={5000}
             onLongPress={() => {
-              Alert.alert("NØDSTOP", "Alarmen blev tvangsslukket.");
+              Toast.show({
+                type: "error",
+                text1: "NØDSTOP 🚨",
+                text2: "Alarmen blev tvangsslukket.",
+              });
               onSuccess();
             }}
           >
