@@ -5,26 +5,28 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    
+    <!-- NYT: Android 14+ kræver denne specifikke FGS tilladelse -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application>
-        <!-- Vores Alarm Service (Den der spiller lyden i baggrunden) -->
+        <!-- Vores Alarm Service. Opdateret til "specialUse" for at matche tilladelsen -->
         <service
             android:name=".AlarmService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
+            android:foregroundServiceType="specialUse" />
 
-        <!-- Lytter efter alarmer fra systemet -->
         <receiver
             android:name=".AlarmReceiver"
             android:enabled="true"
             android:exported="false" />
 
-        <!-- Vækker alarmerne til live igen, hvis telefonen genstarter om natten -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
