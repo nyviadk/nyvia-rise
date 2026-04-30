@@ -46,6 +46,15 @@ export default function HomeScreen() {
     (state) => state.handleAlarmDismissed,
   );
 
+  // Auto-oprydning: Sletter gamle snooze-alarmer, som allerede har ringet
+  useEffect(() => {
+    alarms.forEach((a) => {
+      if (a.id.startsWith("snooze-") && !a.isActive) {
+        removeAlarm(a.id);
+      }
+    });
+  }, [alarms]);
+
   // Lytter efter om appen bliver åbnet, og tvinger scanner frem hvis alarmen ringer
   useEffect(() => {
     const checkAlarmState = () => {
@@ -128,14 +137,52 @@ export default function HomeScreen() {
     }
   };
 
-  const stopAlarm = () => {
-    NyviaRiseModule.stopAlarm();
+  // Håndterer Forskellen på Scan og Panic!
+  const stopAlarm = (method: "scan" | "panic") => {
+    NyviaRiseModule.stopAlarm(); // Slukker den aktuelle larm NU
+
+    // Håndter den originale alarm (skub den til i morgen, eller sluk hvis engangsalarm)
     handleAlarmDismissed();
+
+    if (method === "scan") {
+      Toast.show({
+        type: "success",
+        text1: "Alarm slukket!",
+        text2: "Godmorgen! ☀️ Scanner virkede perfekt.",
+      });
+    } else if (method === "panic") {
+      // PANIK! Brugeren snød. Opret en ny alarm til om et øjeblik.
+      const snoozeDate = new Date();
+      snoozeDate.setSeconds(0, 0); // Rund ned til minuttet...
+      snoozeDate.setMinutes(snoozeDate.getMinutes() + 2); // ...og læg 2 til (giver mellem 61 og 120 sekunders snooze)
+
+      addAlarm({
+        id: `snooze-${Date.now()}`,
+        time: snoozeDate.getTime(),
+        isActive: true,
+        days: [], // Engangsalarm
+        specificDate: snoozeDate.toISOString(),
+      });
+
+      Toast.show({
+        type: "error",
+        text1: "SNOOZE AKTIVERET 🚨",
+        text2: `Du slap ikke! Alarmen ringer igen kl. ${snoozeDate.toLocaleTimeString(
+          "da-DK",
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+          },
+        )}`,
+      });
+    }
+
     setScannerMode("none");
   };
 
   const triggerImmediateTestAlarm = () => {
     NyviaRiseModule.testAlarm();
+    setScannerMode("scan");
   };
 
   const handleExportBackup = async () => {
@@ -145,7 +192,7 @@ export default function HomeScreen() {
       Toast.show({
         type: "error",
         text1: "Fejl",
-        text2: "Kunne ikke eksportere backup.",
+        text2: "Kunne ikke eksportere.",
       });
     }
   };
@@ -192,7 +239,7 @@ export default function HomeScreen() {
       <>
         <QRScanner
           mode={scannerMode}
-          onSuccess={stopAlarm}
+          onSuccess={stopAlarm} // Giver nu enten "scan" eller "panic"
           onCancel={() => setScannerMode("none")}
         />
         <Toast />
@@ -243,51 +290,56 @@ export default function HomeScreen() {
 
           <View style={styles.card}>
             <ThemedText type="subtitle">Dine Alarmer:</ThemedText>
-            {alarms.map((alarm) => (
-              <View key={alarm.id} style={styles.alarmItem}>
-                <View>
-                  <ThemedText type="title">
-                    {new Date(alarm.time).toLocaleTimeString("da-DK", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </ThemedText>
-
-                  {alarm.specificDate ? (
-                    <ThemedText style={{ fontSize: 12, color: "#2196F3" }}>
-                      Dato:{" "}
-                      {new Date(alarm.specificDate).toLocaleDateString("da-DK")}
+            {/* Vi skjuler de irriterende snooze-alarmer fra UI'en så man ikke bare sletter dem */}
+            {alarms
+              .filter((a) => !a.id.startsWith("snooze-"))
+              .map((alarm) => (
+                <View key={alarm.id} style={styles.alarmItem}>
+                  <View>
+                    <ThemedText type="title">
+                      {new Date(alarm.time).toLocaleTimeString("da-DK", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </ThemedText>
-                  ) : alarm.days.length > 0 ? (
-                    <ThemedText style={{ fontSize: 12, color: "#666" }}>
-                      Gentages: {alarm.days.map((d) => dayNames[d]).join(", ")}
-                    </ThemedText>
-                  ) : (
-                    <ThemedText style={{ fontSize: 12, color: "#666" }}>
-                      Engangsalarm
-                    </ThemedText>
-                  )}
+                    {alarm.specificDate ? (
+                      <ThemedText style={{ fontSize: 12, color: "#2196F3" }}>
+                        Dato:{" "}
+                        {new Date(alarm.specificDate).toLocaleDateString(
+                          "da-DK",
+                        )}
+                      </ThemedText>
+                    ) : alarm.days.length > 0 ? (
+                      <ThemedText style={{ fontSize: 12, color: "#666" }}>
+                        Gentages:{" "}
+                        {alarm.days.map((d) => dayNames[d]).join(", ")}
+                      </ThemedText>
+                    ) : (
+                      <ThemedText style={{ fontSize: 12, color: "#666" }}>
+                        Engangsalarm
+                      </ThemedText>
+                    )}
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 15,
+                    }}
+                  >
+                    <Switch
+                      value={alarm.isActive}
+                      onValueChange={() => toggleAlarm(alarm.id)}
+                    />
+                    <Button
+                      title="Slet"
+                      color="#F44336"
+                      onPress={() => removeAlarm(alarm.id)}
+                    />
+                  </View>
                 </View>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 15,
-                  }}
-                >
-                  <Switch
-                    value={alarm.isActive}
-                    onValueChange={() => toggleAlarm(alarm.id)}
-                  />
-                  <Button
-                    title="Slet"
-                    color="#F44336"
-                    onPress={() => removeAlarm(alarm.id)}
-                  />
-                </View>
-              </View>
-            ))}
-            {alarms.length === 0 && (
+              ))}
+            {alarms.filter((a) => !a.id.startsWith("snooze-")).length === 0 && (
               <ThemedText style={{ marginTop: 10, color: "#999" }}>
                 Ingen alarmer sat op.
               </ThemedText>

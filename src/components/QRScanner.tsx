@@ -15,7 +15,8 @@ import { useAlarmStore } from "@/src/store/useAlarmStore";
 
 interface QRScannerProps {
   mode: "scan" | "pair";
-  onSuccess: () => void;
+  // Nu fortæller vi forælderen præcis HVORDAN vi lukkede!
+  onSuccess: (method: "scan" | "panic") => void;
   onCancel: () => void;
 }
 
@@ -25,10 +26,9 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
 
   // States til Tap-nødstop
   const [tapCount, setTapCount] = useState(0);
-  const tapsRequired = 20; // Antal tryk krævet
+  const tapsRequired = 15; // Antal tryk krævet
   const tapResetTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Animation til progress bar
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   const secretQrCodes = useAlarmStore((state) => state.secretQrCodes);
@@ -40,12 +40,11 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
     };
   }, []);
 
-  // Animer progress baren når tapCount ændrer sig
   useEffect(() => {
     Animated.timing(progressAnim, {
       toValue: tapCount / tapsRequired,
-      duration: 100, // Hurtig og snappy animation
-      useNativeDriver: false, // color/width kan ikke bruge native driver fuldt ud i alle versioner
+      duration: 100,
+      useNativeDriver: false,
     }).start();
   }, [tapCount]);
 
@@ -55,12 +54,7 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
     progressAnim.setValue(0);
 
     setTimeout(() => {
-      Toast.show({
-        type: "error",
-        text1: "NØDSTOP 🚨",
-        text2: "Alarm slukket via panic taps.",
-      });
-      onSuccess();
+      onSuccess("panic"); // Sender besked om at det var nødstop
     }, 0);
   };
 
@@ -70,13 +64,11 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
 
       if (newCount >= tapsRequired) {
         executeEmergencyStop();
-        return 0; // Vi er færdige
+        return 0;
       }
       return newCount;
     });
 
-    // Nulstil tap-tælleren NÅDESLØST hvis der går mere end 0.5 sekund mellem tryk.
-    // Du kan ikke "vågn-tappe" en gang, sove lidt, og tappe igen.
     if (tapResetTimerRef.current) {
       clearTimeout(tapResetTimerRef.current);
     }
@@ -90,7 +82,7 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
         visibilityTime: 1500,
         position: "bottom",
       });
-    }, 500); // 0.5 sekunds frist!
+    }, 1000);
   };
 
   if (!permission)
@@ -128,11 +120,11 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
           text1: "Succes! 🔗",
           text2: "Din nye kode er tilføjet.",
         });
-        onSuccess();
+        onSuccess("scan");
       }
     } else {
       if (secretQrCodes.includes(data)) {
-        onSuccess();
+        onSuccess("scan"); // Sender besked om at det var en RIGTIG slukning!
       } else {
         Toast.show({
           type: "error",
@@ -144,13 +136,11 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
     }
   };
 
-  // Beregn bredden af progressbaren
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["0%", "100%"],
   });
 
-  // Skift farven fra gul til rød jo tættere man er på at slukke den
   const progressColor = progressAnim.interpolate({
     inputRange: [0, 0.5, 1],
     outputRange: ["#FFC107", "#FF9800", "#F44336"],
@@ -181,7 +171,7 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
           <ThemedText style={{ color: "#888", marginBottom: 10 }}>
             {tapCount > 0
               ? `Manglende tryk: ${tapsRequired - tapCount}`
-              : "NØDSTOP:"}
+              : "NØDSTOP (GIVER SNOOZE):"}
           </ThemedText>
 
           <Pressable
@@ -191,15 +181,14 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
             ]}
             onPress={handlePanicTap}
           >
-            {/* Progress Bar der fyldes op i baggrunden af knappen */}
             <Animated.View
               style={[
                 StyleSheet.absoluteFill,
                 {
                   backgroundColor: progressColor,
                   width: progressWidth,
-                  borderRadius: 15, // Matcher knappens kant
-                  opacity: 0.3, // Gør den subtil så teksten stadig kan læses
+                  borderRadius: 15,
+                  opacity: 0.3,
                 },
               ]}
             />
@@ -258,9 +247,9 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 2,
     borderColor: "#444",
-    width: "80%", // Fast bredde så den er nem at ramme
-    overflow: "hidden", // Sikrer at progressbaren bliver inde i knappen
-    position: "relative", // Nødvendig for absolute progress bar
+    width: "80%",
+    overflow: "hidden",
+    position: "relative",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -272,6 +261,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     fontSize: 18,
-    zIndex: 10, // Sikrer at teksten er ovenpå progressbaren
+    zIndex: 10,
   },
 });
