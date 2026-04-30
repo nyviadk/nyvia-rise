@@ -1,0 +1,18 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'nyvia.rise'
+version = '0.7.10'
+
+android {
+  namespace "nyvia.rise"
+  defaultConfig {
+    versionCode 1
+    versionName "0.7.10"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}

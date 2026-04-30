@@ -12,6 +12,16 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "nyvia.rise",
+      "permissions": [
+        "CAMERA",
+        "WAKE_LOCK",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "RECEIVE_BOOT_COMPLETED",
+        "DISABLE_KEYGUARD",
+        "FOREGROUND_SERVICE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -37,6 +47,14 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      "expo-audio",
+      "expo-build-properties",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "NyviaRise skal bruge kameraet for at slukke alarmen via QR."
         }
       ]
     ],
