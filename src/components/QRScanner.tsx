@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { StyleSheet, View, Pressable, Text, Button } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import Toast from "react-native-toast-message"; // NYT: Importerer Toast her også!
+import Toast from "react-native-toast-message";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { useAlarmStore } from "@/src/store/useAlarmStore";
@@ -16,8 +16,53 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
+  // States til nødstop
+  const [isHolding, setIsHolding] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(8);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
   const secretQrCodes = useAlarmStore((state) => state.secretQrCodes);
   const addSecretQrCode = useAlarmStore((state) => state.addSecretQrCode);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
+
+  const handlePressIn = () => {
+    setIsHolding(true);
+    setSecondsLeft(8);
+
+    timerRef.current = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          setTimeout(() => {
+            Toast.show({
+              type: "error",
+              text1: "NØDSTOP 🚨",
+              text2: "Alarmen blev tvangsslukket.",
+            });
+            onSuccess();
+          }, 0);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handlePressOut = () => {
+    setIsHolding(false);
+    setSecondsLeft(8);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
 
   if (!permission)
     return (
@@ -57,7 +102,6 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
         onSuccess();
       }
     } else {
-      // Tjekker om koden findes i vores array af godkendte koder
       if (secretQrCodes.includes(data)) {
         onSuccess();
       } else {
@@ -73,6 +117,15 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
 
   return (
     <ThemedView style={styles.container}>
+      {/* STOR NEDTÆLLING I TOPPEN */}
+      <View style={styles.countdownContainer}>
+        {isHolding ? (
+          <Text style={styles.countdownNumber}>{secondsLeft}</Text>
+        ) : (
+          <Text style={styles.countdownPlaceholder}> </Text>
+        )}
+      </View>
+
       <ThemedText type="title" style={styles.title}>
         {mode === "pair" ? "Tilføj ny kode 🔗" : "Tid til at stå op! 🚨"}
       </ThemedText>
@@ -94,24 +147,23 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
       {mode === "scan" && (
         <View style={styles.emergencyContainer}>
           <Pressable
-            style={({ pressed }) => [
+            style={[
               styles.emergencyButton,
-              pressed && styles.emergencyButtonPressed,
+              isHolding && styles.emergencyButtonPressed,
             ]}
-            delayLongPress={5000}
-            onLongPress={() => {
-              Toast.show({
-                type: "error",
-                text1: "NØDSTOP 🚨",
-                text2: "Alarmen blev tvangsslukket.",
-              });
-              onSuccess();
-            }}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
           >
             <Text style={styles.emergencyText}>
-              Hold inde i 5 sek. for nødstop
+              {isHolding ? "SLIP FOR AT ANNULLERE" : "Hold inde for nødstop"}
             </Text>
           </Pressable>
+        </View>
+      )}
+
+      {mode === "pair" && (
+        <View style={{ marginTop: 20 }}>
+          <Button title="Annuller" color="#888" onPress={onCancel} />
         </View>
       )}
     </ThemedView>
@@ -132,6 +184,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
+  // NYT: Styling til den store nedtælling
+  countdownContainer: {
+    height: 100, // Reserverer plads så indholdet ikke hopper
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  countdownNumber: {
+    fontSize: 80,
+    fontWeight: "bold",
+    color: "#F44336", // Rød farve der signalerer alarm/stop
+  },
+  countdownPlaceholder: {
+    fontSize: 80, // Samme størrelse for at holde layoutet stabilt
+  },
   title: { color: "#fff", marginBottom: 10, textAlign: "center" },
   subtitle: { color: "#ccc", marginBottom: 30, textAlign: "center" },
   warningText: { textAlign: "center", marginBottom: 20 },
@@ -147,12 +214,21 @@ const styles = StyleSheet.create({
   emergencyContainer: { marginTop: 40 },
   emergencyButton: {
     backgroundColor: "#333",
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-    borderWidth: 1,
+    paddingVertical: 20, // Gjort knappen lidt større
+    paddingHorizontal: 40,
+    borderRadius: 15, // Blødere kanter
+    borderWidth: 2,
     borderColor: "#555",
+    minWidth: 250,
   },
-  emergencyButtonPressed: { backgroundColor: "#F44336" },
-  emergencyText: { color: "#fff", fontWeight: "bold", textAlign: "center" },
+  emergencyButtonPressed: {
+    backgroundColor: "#D32F2F", // Mørkerød når den holdes nede
+    borderColor: "#FF5252",
+  },
+  emergencyText: {
+    color: "#fff",
+    fontWeight: "bold",
+    textAlign: "center",
+    fontSize: 16, // Lidt større tekst
+  },
 });
