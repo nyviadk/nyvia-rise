@@ -1,41 +1,72 @@
 import { useState } from "react";
-import { View, Text, Button, StyleSheet } from "react-native";
-// Vi importerer vores lokale Kotlin-modul!
+import { View, Button, StyleSheet, Switch } from "react-native";
 import NyviaRiseModule from "../modules/nyvia-rise";
+import { useAlarmStore } from "@/src/store/useAlarmStore";
+import { ThemedView } from "@/components/themed-view";
+import { ThemedText } from "@/components/themed-text";
 
 export default function HomeScreen() {
-  const [status, setStatus] = useState<string>("Ingen alarm sat");
+  const [status, setStatus] = useState<string>("Ingen test i gang");
 
-  // Funktion til at teste alarmen
+  // Hent alarmer og actions direkte fra Zustand - super rent!
+  const alarms = useAlarmStore((state) => state.alarms);
+  const addAlarm = useAlarmStore((state) => state.addAlarm);
+  const toggleAlarm = useAlarmStore((state) => state.toggleAlarm);
+
   const testAlarm = () => {
-    // Sætter alarmen til om præcis 10 sekunder
     const triggerTime = Date.now() + 10 * 1000;
-
-    // Kalder vores Kotlin kode!
     NyviaRiseModule.scheduleAlarm(triggerTime);
-
     setStatus("Alarm sat til om 10 sekunder... Luk evt. appen og vent!");
+
+    // Test: Tilføj den til vores lokale MMKV lager
+    addAlarm({
+      id: Date.now().toString(),
+      time: triggerTime,
+      isActive: true,
+    });
   };
 
-  // Funktion til at stoppe alarmen (som senere bliver aktiveret af QR-scanneren)
   const stopAlarm = () => {
     NyviaRiseModule.stopAlarm();
     setStatus("Alarm stoppet!");
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>NyviaRise 🌅</Text>
-      <Text style={styles.status}>{status}</Text>
+    <ThemedView style={styles.container}>
+      <ThemedText type="title" style={styles.titleSpacing}>
+        NyviaRise 🌅
+      </ThemedText>
+      <ThemedText type="defaultSemiBold" style={styles.status}>
+        {status}
+      </ThemedText>
+
+      {/* Visning af gemte alarmer direkte fra MMKV */}
+      <View style={styles.alarmsList}>
+        <ThemedText type="subtitle">Dine Alarmer ({alarms.length}):</ThemedText>
+        {alarms.map((alarm) => (
+          <View key={alarm.id} style={styles.alarmItem}>
+            <ThemedText>
+              {new Date(alarm.time).toLocaleTimeString("da-DK", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </ThemedText>
+            <Switch
+              value={alarm.isActive}
+              onValueChange={() => toggleAlarm(alarm.id)}
+            />
+          </View>
+        ))}
+      </View>
 
       <View style={styles.buttonContainer}>
         <Button
-          title="Test Alarm (10 sekunder)"
+          title="Test Alarm (10 sek. + Gem)"
           onPress={testAlarm}
           color="#2196F3"
         />
       </View>
-
       <View style={styles.buttonContainer}>
         <Button
           title="NØDSTOP / QR KODE SIMULERING"
@@ -43,7 +74,7 @@ export default function HomeScreen() {
           color="#F44336"
         />
       </View>
-    </View>
+    </ThemedView>
   );
 }
 
@@ -52,23 +83,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#E6F4FE",
     padding: 20,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: "#333",
-  },
-  status: {
-    fontSize: 16,
-    marginBottom: 40,
-    color: "#666",
-    textAlign: "center",
-  },
-  buttonContainer: {
-    marginVertical: 10,
+  titleSpacing: { marginBottom: 10 },
+  status: { marginBottom: 30, textAlign: "center", color: "#666" },
+  buttonContainer: { marginVertical: 10, width: "100%" },
+  alarmsList: {
     width: "100%",
+    marginVertical: 20,
+    padding: 10,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+  },
+  alarmItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginVertical: 8,
   },
 });
