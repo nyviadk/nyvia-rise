@@ -1,2 +1,24 @@
-<manifest>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="nyvia.rise">
+
+    <application>
+        <!-- Fortæller Android at vores Receiver eksisterer, og tillader at den lytter efter alarmer -->
+        <receiver
+            android:name=".AlarmReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <!-- Lytter også efter når telefonen genstarter -->
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Fortæller Android at vores Service eksisterer og må køre i baggrunden/forgrunden -->
+        <service
+            android:name=".AlarmService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback|specialUse" />
+    </application>
+
 </manifest>

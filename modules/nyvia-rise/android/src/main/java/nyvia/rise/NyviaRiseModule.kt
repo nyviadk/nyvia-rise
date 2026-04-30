@@ -1,50 +1,37 @@
 package nyvia.rise
 
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import java.net.URL
 
 class NyviaRiseModule : Module() {
-  // Each module class must implement the definition function. The definition consists of components
-  // that describes the module's functionality and behavior.
-  // See https://docs.expo.dev/modules/module-api for more details about available components.
   override fun definition() = ModuleDefinition {
-    // Sets the name of the module that JavaScript code will use to refer to the module. Takes a string as an argument.
-    // Can be inferred from module's class name, but it's recommended to set it explicitly for clarity.
-    // The module will be accessible from `requireNativeModule('NyviaRise')` in JavaScript.
+    // Navnet vi bruger i TypeScript
     Name("NyviaRise")
 
-    // Defines constant property on the module.
-    Constant("PI") {
-      Math.PI
+    // Kaldes fra appen for at oprette alarmen
+    Function("scheduleAlarm") { timestamp: Long ->
+      val context = appContext.reactContext ?: return@Function
+      val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+      
+      val intent = Intent(context, AlarmReceiver::class.java)
+      val pendingIntent = PendingIntent.getBroadcast(
+        context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+      )
+
+      // Tvinger Android ud af "Doze Mode"
+      val alarmClockInfo = AlarmManager.AlarmClockInfo(timestamp, pendingIntent)
+      alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
     }
 
-    // Defines event names that the module can send to JavaScript.
-    Events("onChange")
-
-    // Defines a JavaScript synchronous function that runs the native code on the JavaScript thread.
-    Function("hello") {
-      "Hello world! 👋"
-    }
-
-    // Defines a JavaScript function that always returns a Promise and whose native code
-    // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("setValueAsync") { value: String ->
-      // Send an event to JavaScript.
-      sendEvent("onChange", mapOf(
-        "value" to value
-      ))
-    }
-
-    // Enables the module to be used as a native view. Definition components that are accepted as part of
-    // the view definition: Prop, Events.
-    View(NyviaRiseView::class) {
-      // Defines a setter for the `url` prop.
-      Prop("url") { view: NyviaRiseView, url: URL ->
-        view.webView.loadUrl(url.toString())
-      }
-      // Defines an event that the view can send to JavaScript.
-      Events("onLoad")
+    // Kaldes fra appen når QR-koden scannes
+    Function("stopAlarm") {
+      val context = appContext.reactContext ?: return@Function
+      val intent = Intent(context, AlarmService::class.java)
+      context.stopService(intent)
     }
   }
 }
