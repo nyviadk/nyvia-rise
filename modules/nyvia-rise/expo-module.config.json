@@ -4,6 +4,6 @@
     "modules": ["NyviaRiseModule"]
   },
   "android": {
-    "modules": ["nyvia.rise.NyviaRiseModule"]
+    "modules": ["nyvia.rise.module.NyviaRiseModule"]
   }
 }
