@@ -1,66 +1,69 @@
 import React, { useState } from "react";
-import { StyleSheet, Button, View, Alert } from "react-native";
+import { StyleSheet, View, Alert, Pressable, Text, Button } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
-import { SECRET_QR_CODE } from "../code";
+import { useAlarmStore } from "@/src/store/useAlarmStore";
 
 interface QRScannerProps {
+  mode: "scan" | "pair";
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export function QRScanner({ onSuccess, onCancel }: QRScannerProps) {
+export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
-  // Dette er den hemmelige kode, appen leder efter!
-  // Senere kan du printe en QR-kode, der indeholder præcis denne tekst.
+  const secretQrCode = useAlarmStore((state) => state.secretQrCode);
+  const setSecretQrCode = useAlarmStore((state) => state.setSecretQrCode);
 
-  // Venter på at systemet tjekker tilladelser
-  if (!permission) {
+  if (!permission)
     return (
       <ThemedView style={styles.center}>
-        <ThemedText>Henter kamerarettigheder...</ThemedText>
+        <ThemedText>Henter kamera...</ThemedText>
       </ThemedView>
     );
-  }
-
-  // Hvis brugeren ikke har givet tilladelse endnu
   if (!permission.granted) {
     return (
       <ThemedView style={styles.center}>
         <ThemedText style={styles.warningText}>
-          NyviaRise SKAL bruge kameraet for at du kan slukke alarmen!
+          Kamera kræves for at slukke alarmen!
         </ThemedText>
         <Button title="Giv tilladelse" onPress={requestPermission} />
       </ThemedView>
     );
   }
 
-  // Håndter scanning
   const handleBarcodeScanned = ({ data }: { data: string }) => {
     setScanned(true);
 
-    if (data === SECRET_QR_CODE) {
-      onSuccess(); // Rigtig kode = Stop alarmen!
+    if (mode === "pair") {
+      setSecretQrCode(data);
+      Alert.alert("Succes!", "Din nye kode er gemt.");
+      onSuccess();
     } else {
-      Alert.alert(
-        "Forkert QR-kode",
-        "Det der er ikke badeværelset! Prøv igen.",
-      );
-      // Tillad et nyt forsøg efter 2 sekunder
-      setTimeout(() => setScanned(false), 2000);
+      if (data === secretQrCode) {
+        onSuccess();
+      } else {
+        Alert.alert(
+          "Forkert stregkode!",
+          "Det er ikke den rigtige kode. Prøv igen.",
+        );
+        setTimeout(() => setScanned(false), 2000);
+      }
     }
   };
 
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="title" style={styles.title}>
-        Tid til at stå op! 🚨
+        {mode === "pair" ? "Par ny kode 🔗" : "Tid til at stå op! 🚨"}
       </ThemedText>
       <ThemedText type="subtitle" style={styles.subtitle}>
-        Scan koden på badeværelset for at slukke.
+        {mode === "pair"
+          ? "Scan den kode du vil bruge fremover."
+          : "Scan koden på badeværelset for at slukke."}
       </ThemedText>
 
       <View style={styles.cameraContainer}>
@@ -68,18 +71,31 @@ export function QRScanner({ onSuccess, onCancel }: QRScannerProps) {
           style={StyleSheet.absoluteFillObject}
           facing="back"
           onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
-          barcodeScannerSettings={{
-            barcodeTypes: ["qr"], // Vi lytter KUN efter QR koder for at spare batteri/CPU
-          }}
+          barcodeScannerSettings={{ barcodeTypes: ["qr", "ean13", "ean8"] }}
         />
       </View>
 
-      {/* Midlertidig knap til at lukke scanneren, mens vi udvikler */}
-      <Button
-        title="Annuller (Kun til test)"
-        onPress={onCancel}
-        color="#F44336"
-      />
+      <Button title="Annuller (Kun test)" onPress={onCancel} color="#888" />
+
+      {mode === "scan" && (
+        <View style={styles.emergencyContainer}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.emergencyButton,
+              pressed && styles.emergencyButtonPressed,
+            ]}
+            delayLongPress={10000}
+            onLongPress={() => {
+              Alert.alert("NØDSTOP", "Alarmen blev tvangsslukket.");
+              onSuccess();
+            }}
+          >
+            <Text style={styles.emergencyText}>
+              Hold inde i 5 sek. for nødstop
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </ThemedView>
   );
 }
@@ -90,7 +106,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    backgroundColor: "#000", // Sort baggrund til scanneren ser lidt skarpere ud
+    backgroundColor: "#000",
   },
   center: {
     flex: 1,
@@ -98,20 +114,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
-  title: {
-    color: "#fff",
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  subtitle: {
-    color: "#ccc",
-    marginBottom: 30,
-    textAlign: "center",
-  },
-  warningText: {
-    textAlign: "center",
-    marginBottom: 20,
-  },
+  title: { color: "#fff", marginBottom: 10, textAlign: "center" },
+  subtitle: { color: "#ccc", marginBottom: 30, textAlign: "center" },
+  warningText: { textAlign: "center", marginBottom: 20 },
   cameraContainer: {
     width: 300,
     height: 300,
@@ -121,4 +126,15 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "#2196F3",
   },
+  emergencyContainer: { marginTop: 40 },
+  emergencyButton: {
+    backgroundColor: "#333",
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#555",
+  },
+  emergencyButtonPressed: { backgroundColor: "#F44336" },
+  emergencyText: { color: "#fff", fontWeight: "bold", textAlign: "center" },
 });
