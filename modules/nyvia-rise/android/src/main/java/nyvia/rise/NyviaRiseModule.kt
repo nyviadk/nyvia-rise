@@ -14,9 +14,7 @@ class NyviaRiseModule : Module() {
     Function("scheduleAlarm") { timestamp: Long ->
       val context = appContext.reactContext
       
-      // Sikker if-sætning der ikke crasher Kotlin compileren!
       if (context != null) {
-        // Gem til BootReceiver (hvis telefonen genstarter)
         val prefs = context.getSharedPreferences("nyviarise_prefs", Context.MODE_PRIVATE)
         prefs.edit().putLong("next_alarm", timestamp).apply()
 
@@ -27,11 +25,10 @@ class NyviaRiseModule : Module() {
         )
 
         if (timestamp > System.currentTimeMillis()) {
-          // AlarmClockInfo er den mest aggressive måde at vække Android på i Doze Mode
           val alarmClockInfo = AlarmManager.AlarmClockInfo(timestamp, pendingIntent)
           alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
         } else {
-          alarmManager.cancel(pendingIntent) // Aflys alarm hvis tid = 0
+          alarmManager.cancel(pendingIntent)
         }
       }
     }
@@ -43,6 +40,23 @@ class NyviaRiseModule : Module() {
         val intent = Intent(context, AlarmService::class.java)
         context.stopService(intent)
       }
+    }
+
+    Function("testAlarm") {
+      val context = appContext.reactContext
+      if (context != null) {
+        val intent = Intent(context, AlarmService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
+      }
+    }
+
+    // NY FUNKTION: Tjekker om alarmen bipper lige nu
+    Function("isAlarmActive") {
+      return@Function AlarmService.isRinging
     }
   }
 }

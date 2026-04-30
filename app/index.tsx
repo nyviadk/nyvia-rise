@@ -9,6 +9,7 @@ import {
   Share,
   TextInput,
   ScrollView,
+  AppState,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Toast from "react-native-toast-message";
@@ -44,6 +45,31 @@ export default function HomeScreen() {
   const handleAlarmDismissed = useAlarmStore(
     (state) => state.handleAlarmDismissed,
   );
+
+  // Lytter efter om appen bliver åbnet, og tvinger scanner frem hvis alarmen ringer
+  useEffect(() => {
+    const checkAlarmState = () => {
+      // Vi kalder vores nye Kotlin funktion
+      const isRinging = NyviaRiseModule.isAlarmActive();
+      if (isRinging) {
+        setScannerMode("scan");
+      }
+    };
+
+    // Tjek med det samme ved kold opstart
+    checkAlarmState();
+
+    // Tjek hver gang appen kommer tilbage fra baggrunden eller når telefonen låses op
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
+        checkAlarmState();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const checkPermissions = async () => {
@@ -106,6 +132,10 @@ export default function HomeScreen() {
     NyviaRiseModule.stopAlarm();
     handleAlarmDismissed();
     setScannerMode("none");
+  };
+
+  const triggerImmediateTestAlarm = () => {
+    NyviaRiseModule.testAlarm();
   };
 
   const handleExportBackup = async () => {
@@ -172,7 +202,6 @@ export default function HomeScreen() {
 
   const dayNames = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"];
 
-  // Vi pakker ScrollView ind i et Fragment (<>) for at kunne lægge Toast i bunden
   return (
     <>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -315,9 +344,32 @@ export default function HomeScreen() {
             />
           </View>
 
-          <View style={[styles.buttonContainer, { marginTop: 40 }]}>
+          <View
+            style={[
+              styles.buttonContainer,
+              {
+                marginTop: 40,
+                borderTopWidth: 1,
+                paddingTop: 20,
+                borderColor: "#eee",
+              },
+            ]}
+          >
+            <ThemedText
+              style={{ textAlign: "center", marginBottom: 10, color: "#666" }}
+            >
+              Udvikler Værktøj:
+            </ThemedText>
             <Button
-              title="🚨 TEST QR SCANNER"
+              title="🔊 TRIGGER TEST ALARM NU"
+              onPress={triggerImmediateTestAlarm}
+              color="#E91E63"
+            />
+          </View>
+
+          <View style={[styles.buttonContainer, { marginTop: 10 }]}>
+            <Button
+              title="🚨 SIMULÉR KUN SCANNER"
               onPress={() => setScannerMode("scan")}
               color="#FF9800"
             />

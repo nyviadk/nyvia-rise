@@ -13,12 +13,19 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 
 class AlarmService : Service() {
+    companion object {
+        // Denne variabel lader appen vide, om alarmen larmer lige nu!
+        var isRinging = false
+    }
+
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        isRinging = true // Markér at alarmen er aktiv
+        
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.FULL_WAKE_LOCK or
@@ -30,7 +37,10 @@ class AlarmService : Service() {
 
         createNotificationChannel()
         
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+
         val pendingIntent = PendingIntent.getActivity(
             this, 0, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -45,11 +55,18 @@ class AlarmService : Service() {
             .setOngoing(true)
             .build()
 
-        // NYT: Android 14+ (API 34) kræver, at vi eksplicit definerer typen her!
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
             startForeground(1, notification)
+        }
+
+        if (launchIntent != null) {
+            try {
+                startActivity(launchIntent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
@@ -71,6 +88,7 @@ class AlarmService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        isRinging = false // Slå status fra, når servicen dør
         mediaPlayer?.stop()
         mediaPlayer?.release()
         wakeLock?.let {
