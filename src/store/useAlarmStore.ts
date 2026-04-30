@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage, StateStorage } from "zustand/middleware";
 import { createMMKV } from "react-native-mmkv";
+import NyviaRiseModule from "@/modules/nyvia-rise"; // Husk broen til Kotlin!
 
 // 1. Initialiser MMKV
 const mmkv = createMMKV({
@@ -9,56 +10,86 @@ const mmkv = createMMKV({
 
 // 2. Byg broen mellem Zustand og MMKV
 const zustandStorage: StateStorage = {
-  setItem: (name, value) => {
-    return mmkv.set(name, value);
-  },
-  getItem: (name) => {
-    const value = mmkv.getString(name);
-    return value ?? null;
-  },
-  removeItem: (name) => {
-    return mmkv.remove(name);
-  },
+  setItem: (name, value) => mmkv.set(name, value),
+  getItem: (name) => mmkv.getString(name) ?? null,
+  removeItem: (name) => mmkv.remove(name),
 };
 
-// 3. Vores Alarm Datamodel
 export interface Alarm {
   id: string;
-  time: number;
+  time: number; // Unix timestamp
   isActive: boolean;
-  days?: number[];
 }
 
-// 4. Definer hvad vores Store skal kunne
 interface AlarmState {
   alarms: Alarm[];
   addAlarm: (alarm: Alarm) => void;
   removeAlarm: (id: string) => void;
   toggleAlarm: (id: string) => void;
+  syncWithAndroid: () => void;
 }
 
-// 5. Opret selve Zustand Store med persist middleware
 export const useAlarmStore = create<AlarmState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       alarms: [],
 
-      addAlarm: (alarm) =>
-        set((state) => ({ alarms: [...state.alarms, alarm] })),
+      addAlarm: (alarm) => {
+        set((state) => ({ alarms: [...state.alarms, alarm] }));
+        get().syncWithAndroid(); // Opdater Android
+      },
 
-      removeAlarm: (id) =>
-        set((state) => ({ alarms: state.alarms.filter((a) => a.id !== id) })),
+      removeAlarm: (id) => {
+        set((state) => ({ alarms: state.alarms.filter((a) => a.id !== id) }));
+        get().syncWithAndroid(); // Opdater Android
+      },
 
-      toggleAlarm: (id) =>
+      toggleAlarm: (id) => {
         set((state) => ({
           alarms: state.alarms.map((a) =>
             a.id === id ? { ...a, isActive: !a.isActive } : a,
           ),
-        })),
+        }));
+        get().syncWithAndroid(); // Opdater Android
+      },
+
+      // Hjernen: Finder den næste aktive alarm og sender den til Kotlin
+      syncWithAndroid: () => {
+        const { alarms } = get();
+
+        // Find alle aktive alarmer, der ligger ude i fremtiden
+        const now = Date.now();
+        const activeFutureAlarms = alarms.filter(
+          (a) => a.isActive && a.time > now,
+        );
+
+        if (activeFutureAlarms.length > 0) {
+          // Sorter dem, så vi finder den, der ringer først
+          activeFutureAlarms.sort((a, b) => a.time - b.time);
+          const nextAlarm = activeFutureAlarms[0];
+
+          // Send timestamp (tidszone sikkert!) til Kotlin
+          NyviaRiseModule.scheduleAlarm(nextAlarm.time);
+          console.log(
+            "Android opdateret: Næste alarm ringer",
+            new Date(nextAlarm.time),
+          );
+        } else {
+          // Hvis der ingen aktive alarmer er, sender vi bare 0 til Kotlin.
+          // (Dette kræver en lille justering i vores Kotlin kode senere, så den sletter alarmen, hvis time == 0)
+          NyviaRiseModule.scheduleAlarm(0);
+          console.log("Ingen aktive alarmer - Android sat på pause.");
+        }
+      },
     }),
     {
-      name: "nyviarise-storage", // Navnet på nøglen i MMKV
+      name: "nyviarise-storage",
       storage: createJSONStorage(() => zustandStorage),
+      // Vi bruger onRehydrateStorage til at sikre, at appen automatisk
+      // gen-synkroniserer med Android, når appen starter op og henter fra MMKV.
+      onRehydrateStorage: () => (state) => {
+        if (state) state.syncWithAndroid();
+      },
     },
   ),
 );
