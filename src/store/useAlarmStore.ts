@@ -14,16 +14,17 @@ const zustandStorage: StateStorage = {
 
 export interface Alarm {
   id: string;
-  time: number; // Unix timestamp for næste ringning
+  time: number;
   isActive: boolean;
-  days: number[]; // [0-6] for ugedage
-  specificDate?: string | null; // Gemmes som ISO string, hvis en specifik kalenderdag er valgt
+  days: number[];
+  specificDate?: string | null;
 }
 
 interface AlarmState {
   alarms: Alarm[];
-  secretQrCode: string | null;
-  setSecretQrCode: (code: string) => void;
+  secretQrCodes: string[]; // NYT: Array af godkendte koder
+  addSecretQrCode: (code: string) => void;
+  removeSecretQrCode: (code: string) => void;
   addAlarm: (alarm: Alarm) => void;
   removeAlarm: (id: string) => void;
   toggleAlarm: (id: string) => void;
@@ -36,14 +37,22 @@ export const useAlarmStore = create<AlarmState>()(
   persist(
     (set, get) => ({
       alarms: [],
-      secretQrCode: null,
+      secretQrCodes: [], // Starter som en tom liste
 
-      setSecretQrCode: (code) => set({ secretQrCode: code }),
+      addSecretQrCode: (code) =>
+        set((state) => {
+          // Tilføj kun hvis den ikke allerede findes
+          if (state.secretQrCodes.includes(code)) return state;
+          return { secretQrCodes: [...state.secretQrCodes, code] };
+        }),
+
+      removeSecretQrCode: (code) =>
+        set((state) => ({
+          secretQrCodes: state.secretQrCodes.filter((c) => c !== code),
+        })),
 
       addAlarm: (newAlarm) => {
-        const { alarms, toggleAlarm, syncWithAndroid } = get();
-
-        // Tjek for duplikater: Matcher time, minut, ugedage og evt. specifik dato?
+        const { alarms, syncWithAndroid } = get();
         const newDate = new Date(newAlarm.time);
 
         const existing = alarms.find((a) => {
@@ -60,7 +69,6 @@ export const useAlarmStore = create<AlarmState>()(
 
         if (existing) {
           if (!existing.isActive) {
-            // Findes allerede, men er slukket. Tænd den og opdater dens tid!
             set((state) => ({
               alarms: state.alarms.map((a) =>
                 a.id === existing.id
@@ -70,10 +78,9 @@ export const useAlarmStore = create<AlarmState>()(
             }));
             syncWithAndroid();
           }
-          return; // Gør intet, hvis den allerede findes og er tændt
+          return;
         }
 
-        // Ellers opret en ny
         set((state) => ({ alarms: [...state.alarms, newAlarm] }));
         syncWithAndroid();
       },
@@ -97,11 +104,8 @@ export const useAlarmStore = create<AlarmState>()(
         get().syncWithAndroid();
       },
 
-      // KØRER NÅR DU HAR SCANNKET KODEN
       handleAlarmDismissed: () => {
         const { alarms, toggleAlarm, syncWithAndroid } = get();
-
-        // Finder den alarm der lige har ringet (den aktive alarm med den ældste tid)
         const activeAlarms = alarms
           .filter((a) => a.isActive)
           .sort((a, b) => a.time - b.time);
@@ -110,7 +114,6 @@ export const useAlarmStore = create<AlarmState>()(
           const ringingAlarm = activeAlarms[0];
 
           if (ringingAlarm.days.length > 0) {
-            // GENTAGENDE ALARM: Udregn næste ugedag og skub alarmen, behold den aktiv
             const baseDate = new Date();
             baseDate.setHours(
               new Date(ringingAlarm.time).getHours(),
@@ -118,7 +121,6 @@ export const useAlarmStore = create<AlarmState>()(
               0,
               0,
             );
-
             const nextTime = calculateNextAlarmTime(
               baseDate,
               ringingAlarm.days,
@@ -130,7 +132,6 @@ export const useAlarmStore = create<AlarmState>()(
               ),
             }));
           } else {
-            // ENGANGS ALARM ELLER SPECIFIK DATO: Slå den fra
             toggleAlarm(ringingAlarm.id);
           }
           syncWithAndroid();

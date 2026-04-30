@@ -27,19 +27,16 @@ export default function HomeScreen() {
   const [scannerMode, setScannerMode] = useState<"none" | "scan" | "pair">(
     "none",
   );
-
-  // Pickers
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [specificDate, setSpecificDate] = useState<Date | null>(null);
-
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
 
   const alarms = useAlarmStore((state) => state.alarms);
-  const secretQrCode = useAlarmStore((state) => state.secretQrCode);
+  const secretQrCodes = useAlarmStore((state) => state.secretQrCodes);
+  const removeSecretQrCode = useAlarmStore((state) => state.removeSecretQrCode);
   const addAlarm = useAlarmStore((state) => state.addAlarm);
   const toggleAlarm = useAlarmStore((state) => state.toggleAlarm);
   const removeAlarm = useAlarmStore((state) => state.removeAlarm);
@@ -59,23 +56,21 @@ export default function HomeScreen() {
     checkPermissions();
   }, []);
 
-  // Håndter når dato vælges
   const handleDateSelected = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
     if (event.type === "set" && selectedDate) {
       setSpecificDate(selectedDate);
-      setSelectedDays([]); // Rydder ugedage, da man ikke kan have begge dele
+      setSelectedDays([]);
     }
   };
 
-  // Håndter når tid vælges
   const handleTimeSelected = (event: any, selectedDate?: Date) => {
     setShowTimePicker(false);
     if (event.type === "set" && selectedDate) {
-      if (!secretQrCode) {
+      if (secretQrCodes.length === 0) {
         Alert.alert(
           "Hov!",
-          "Du skal parre en QR/Stregkode, før du kan sætte en alarm.",
+          "Du skal tilføje mindst én stregkode, før du kan sætte en alarm.",
         );
         return;
       }
@@ -99,7 +94,6 @@ export default function HomeScreen() {
         `Planlagt til om ${getTimeRemainingText(triggerTime)}`,
       );
 
-      // Nulstil valg
       setSelectedDays([]);
       setSpecificDate(null);
     }
@@ -107,7 +101,7 @@ export default function HomeScreen() {
 
   const stopAlarm = () => {
     NyviaRiseModule.stopAlarm();
-    handleAlarmDismissed(); // Fortæller Zustand at rulle gentagende alarmer frem!
+    handleAlarmDismissed();
     setScannerMode("none");
   };
 
@@ -140,7 +134,7 @@ export default function HomeScreen() {
       setSelectedDays(selectedDays.filter((d) => d !== dayIndex));
     } else {
       setSelectedDays([...selectedDays, dayIndex]);
-      setSpecificDate(null); // Rydder kalenderdato, hvis man klikker på ugedage
+      setSpecificDate(null);
     }
   };
 
@@ -163,17 +157,40 @@ export default function HomeScreen() {
           NyviaRise 🌅
         </ThemedText>
 
-        {!secretQrCode ? (
-          <ThemedText style={{ color: "red", marginBottom: 20 }}>
-            ⚠️ Ingen stregkode parret endnu!
+        {/* -- START: HÅNDTERING AF KODER -- */}
+        <View style={styles.card}>
+          <ThemedText type="subtitle">
+            Godkendte Koder ({secretQrCodes.length})
           </ThemedText>
-        ) : (
-          <ThemedText style={{ color: "green", marginBottom: 20 }}>
-            ✅ Stregkode parret og klar
-          </ThemedText>
-        )}
+          {secretQrCodes.length === 0 ? (
+            <ThemedText style={{ color: "red", marginTop: 10 }}>
+              ⚠️ Ingen stregkode parret!
+            </ThemedText>
+          ) : (
+            secretQrCodes.map((code) => (
+              <View key={code} style={styles.codeItem}>
+                <ThemedText style={{ flex: 1 }} numberOfLines={1}>
+                  *{code.slice(-6)}
+                </ThemedText>
+                <Button
+                  title="Fjern"
+                  color="#F44336"
+                  onPress={() => removeSecretQrCode(code)}
+                />
+              </View>
+            ))
+          )}
+          <View style={{ marginTop: 10 }}>
+            <Button
+              title="+ TILFØJ NY KODE"
+              onPress={() => setScannerMode("pair")}
+              color="#2196F3"
+            />
+          </View>
+        </View>
+        {/* -- SLUT: HÅNDTERING AF KODER -- */}
 
-        <View style={styles.alarmsList}>
+        <View style={styles.card}>
           <ThemedText type="subtitle">Dine Alarmer:</ThemedText>
           {alarms.map((alarm) => (
             <View key={alarm.id} style={styles.alarmItem}>
@@ -272,15 +289,7 @@ export default function HomeScreen() {
           />
         </View>
 
-        <View style={[styles.buttonContainer, { marginTop: 30 }]}>
-          <Button
-            title="🔗 PAR NY STREGKODE"
-            onPress={() => setScannerMode("pair")}
-            color="#2196F3"
-          />
-        </View>
-
-        <View style={[styles.buttonContainer, { marginTop: 10 }]}>
+        <View style={[styles.buttonContainer, { marginTop: 40 }]}>
           <Button
             title="🚨 TEST QR SCANNER"
             onPress={() => setScannerMode("scan")}
@@ -343,13 +352,22 @@ const styles = StyleSheet.create({
   },
   titleSpacing: { marginBottom: 10, marginTop: 40 },
   buttonContainer: { marginVertical: 5, width: "100%" },
-  alarmsList: {
+  card: {
     width: "100%",
-    marginVertical: 20,
+    marginVertical: 10,
     padding: 20,
     backgroundColor: "#fff",
     borderRadius: 15,
     elevation: 2,
+  },
+  codeItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
   },
   alarmItem: {
     flexDirection: "row",

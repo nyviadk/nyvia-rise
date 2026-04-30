@@ -15,8 +15,8 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
-  const secretQrCode = useAlarmStore((state) => state.secretQrCode);
-  const setSecretQrCode = useAlarmStore((state) => state.setSecretQrCode);
+  const secretQrCodes = useAlarmStore((state) => state.secretQrCodes);
+  const addSecretQrCode = useAlarmStore((state) => state.addSecretQrCode);
 
   if (!permission)
     return (
@@ -39,16 +39,25 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
     setScanned(true);
 
     if (mode === "pair") {
-      setSecretQrCode(data);
-      Alert.alert("Succes!", "Din nye kode er gemt.");
-      onSuccess();
+      if (secretQrCodes.includes(data)) {
+        Alert.alert(
+          "Allerede parret",
+          "Denne stregkode findes allerede på din liste.",
+        );
+        setTimeout(() => setScanned(false), 2000);
+      } else {
+        addSecretQrCode(data);
+        Alert.alert("Succes!", "Din nye kode er tilføjet.");
+        onSuccess();
+      }
     } else {
-      if (data === secretQrCode) {
+      // Tjekker om koden findes i vores array af godkendte koder
+      if (secretQrCodes.includes(data)) {
         onSuccess();
       } else {
         Alert.alert(
           "Forkert stregkode!",
-          "Det er ikke den rigtige kode. Prøv igen.",
+          "Dette er ikke en af dine parrede koder. Prøv igen.",
         );
         setTimeout(() => setScanned(false), 2000);
       }
@@ -58,12 +67,12 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="title" style={styles.title}>
-        {mode === "pair" ? "Par ny kode 🔗" : "Tid til at stå op! 🚨"}
+        {mode === "pair" ? "Tilføj ny kode 🔗" : "Tid til at stå op! 🚨"}
       </ThemedText>
       <ThemedText type="subtitle" style={styles.subtitle}>
         {mode === "pair"
-          ? "Scan den kode du vil bruge fremover."
-          : "Scan koden på badeværelset for at slukke."}
+          ? "Scan den kode du vil tilføje."
+          : "Scan en af dine godkendte koder for at slukke."}
       </ThemedText>
 
       <View style={styles.cameraContainer}>
@@ -84,7 +93,7 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
               styles.emergencyButton,
               pressed && styles.emergencyButtonPressed,
             ]}
-            delayLongPress={10000}
+            delayLongPress={5000}
             onLongPress={() => {
               Alert.alert("NØDSTOP", "Alarmen blev tvangsslukket.");
               onSuccess();
