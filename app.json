@@ -67,7 +67,8 @@
           "cameraPermission": "NyviaRise skal bruge kameraet for at slukke alarmen via QR."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
