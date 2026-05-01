@@ -419,14 +419,6 @@ export default function HomeScreen() {
             />
           </View>
 
-          <View style={[styles.buttonContainer, { marginTop: 10 }]}>
-            <Button
-              title="🚨 SIMULÉR KUN SCANNER"
-              onPress={() => setScannerMode("scan")}
-              color="#FF9800"
-            />
-          </View>
-
           <View style={styles.backupContainer}>
             <Button
               title="Eksportér"
