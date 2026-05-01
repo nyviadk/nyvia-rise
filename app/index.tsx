@@ -1,4 +1,14 @@
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import NyviaRiseModule from "@/modules/nyvia-rise";
+import { QRScanner } from "@/src/components/QRScanner";
+import { Alarm, useAlarmStore } from "@/src/store/useAlarmStore";
+import {
+  calculateNextAlarmTime,
+  getTimeRemainingText,
+} from "@/src/utils/time-helpers";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as Clipboard from "expo-clipboard";
 import React, { useEffect, useState } from "react";
 import {
   AppState,
@@ -10,21 +20,10 @@ import {
   StatusBar,
   StyleSheet,
   Switch,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
-
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import NyviaRiseModule from "@/modules/nyvia-rise";
-import { QRScanner } from "@/src/components/QRScanner";
-import { Alarm, useAlarmStore } from "@/src/store/useAlarmStore";
-import {
-  calculateNextAlarmTime,
-  getTimeRemainingText,
-} from "@/src/utils/time-helpers";
 
 export default function HomeScreen() {
   const [scannerMode, setScannerMode] = useState<"none" | "scan" | "pair">(
@@ -42,10 +41,6 @@ export default function HomeScreen() {
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [specificDate, setSpecificDate] = useState<Date | null>(null);
   const [pendingTime, setPendingTime] = useState<Date | null>(null);
-
-  const [showImport, setShowImport] = useState(false);
-  const [importText, setImportText] = useState("");
-
   const alarms = useAlarmStore((state) => state.alarms);
   const secretQrCodes = useAlarmStore((state) => state.secretQrCodes);
   const removeSecretQrCode = useAlarmStore((state) => state.removeSecretQrCode);
@@ -260,6 +255,48 @@ export default function HomeScreen() {
     }
   };
 
+  const handleImportFromClipboard = async () => {
+    try {
+      // Tjek om der overhovedet er tekst i udklipsholderen
+      const hasText = await Clipboard.hasStringAsync();
+      if (!hasText) {
+        Toast.show({
+          type: "info",
+          text1: "Udklipsholderen er tom",
+          text2: "Kopier din JSON-backup først.",
+        });
+        return;
+      }
+
+      // Hent teksten
+      const clipboardText = await Clipboard.getStringAsync();
+
+      // Prøv at parse det som JSON
+      const parsed = JSON.parse(clipboardText);
+
+      if (Array.isArray(parsed)) {
+        importAlarms(parsed);
+        Toast.show({
+          type: "success",
+          text1: "Alarmer importeret!",
+          text2: `${parsed.length} alarmer blev indlæst fra udklipsholderen.`,
+        });
+      } else {
+        Toast.show({
+          type: "error",
+          text1: "Ugyldigt format",
+          text2: "Data i udklipsholderen er ikke en gyldig backup.",
+        });
+      }
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: "Kunne ikke importere",
+        text2: "Er du sikker på, at du har kopieret ren JSON?",
+      });
+    }
+  };
+
   const dayNames = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"];
   const displayAlarms = alarms.filter((a) => !a.id.startsWith("snooze-"));
 
@@ -421,50 +458,12 @@ export default function HomeScreen() {
                     <ThemedText style={styles.textLink}>Eksportér</ThemedText>
                   </TouchableOpacity>
                   <ThemedText style={{ color: "#ccc" }}>|</ThemedText>
-                  <TouchableOpacity onPress={() => setShowImport(!showImport)}>
-                    <ThemedText style={styles.textLink}>Importér</ThemedText>
+                  <TouchableOpacity onPress={handleImportFromClipboard}>
+                    <ThemedText style={styles.textLink}>
+                      Importér fra udklipsholder
+                    </ThemedText>
                   </TouchableOpacity>
                 </View>
-
-                {showImport && (
-                  <View style={styles.importBox}>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Indsæt JSON backup her..."
-                      placeholderTextColor="#999"
-                      value={importText}
-                      onChangeText={setImportText}
-                      multiline
-                      showSoftInputOnFocus
-                    />
-                    <TouchableOpacity
-                      style={styles.secondaryButton}
-                      onPress={() => {
-                        try {
-                          const parsed = JSON.parse(importText);
-                          if (Array.isArray(parsed)) {
-                            importAlarms(parsed);
-                            Toast.show({
-                              type: "success",
-                              text1: "Alarmer importeret!",
-                            });
-                            setShowImport(false);
-                            setImportText("");
-                          }
-                        } catch (e) {
-                          Toast.show({
-                            type: "error",
-                            text1: "Ugyldigt format!",
-                          });
-                        }
-                      }}
-                    >
-                      <ThemedText style={styles.secondaryButtonText}>
-                        Gennemfør import
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                )}
               </View>
             </ThemedView>
           </ScrollView>
@@ -780,22 +779,6 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   textLink: { color: "#2196F3", fontWeight: "600" },
-  importBox: {
-    width: "100%",
-    padding: 15,
-    backgroundColor: "#fff",
-    borderRadius: 15,
-    marginBottom: 30,
-  },
-  input: {
-    backgroundColor: "#F7F9FC",
-    padding: 15,
-    marginBottom: 15,
-    borderRadius: 10,
-    minHeight: 80,
-    textAlignVertical: "top",
-    color: "#333",
-  },
   fab: {
     position: "absolute",
     right: 25,
