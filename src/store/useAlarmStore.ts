@@ -1,8 +1,8 @@
-import { create } from "zustand";
-import { persist, createJSONStorage, StateStorage } from "zustand/middleware";
-import { createMMKV } from "react-native-mmkv";
 import NyviaRiseModule from "@/modules/nyvia-rise";
 import { calculateNextAlarmTime } from "@/src/utils/time-helpers";
+import { createMMKV } from "react-native-mmkv";
+import { create } from "zustand";
+import { createJSONStorage, persist, StateStorage } from "zustand/middleware";
 
 const mmkv = createMMKV({ id: "nyviarise-alarms" });
 
@@ -20,7 +20,6 @@ export interface Alarm {
   specificDate?: string | null;
 }
 
-// NYT: Definerer stregkoder som et objekt, så vi kan gemme navnene
 export interface SecretQrCode {
   id: string;
   code: string;
@@ -33,6 +32,7 @@ interface AlarmState {
   addSecretQrCode: (qrCode: SecretQrCode) => void;
   removeSecretQrCode: (id: string) => void;
   addAlarm: (alarm: Alarm) => void;
+  updateAlarm: (id: string, updatedData: Partial<Alarm>) => void;
   removeAlarm: (id: string) => void;
   toggleAlarm: (id: string) => void;
   importAlarms: (importedAlarms: Alarm[]) => void;
@@ -48,13 +48,11 @@ export const useAlarmStore = create<AlarmState>()(
 
       addSecretQrCode: (newQrCode) =>
         set((state) => {
-          // Undgå dubletter af selve stregkode-dataen
           if (state.secretQrCodes.some((qr) => qr.code === newQrCode.code))
             return state;
           return { secretQrCodes: [...state.secretQrCodes, newQrCode] };
         }),
 
-      // Nu sletter vi ud fra ID'et
       removeSecretQrCode: (id) =>
         set((state) => ({
           secretQrCodes: state.secretQrCodes.filter((qr) => qr.id !== id),
@@ -94,10 +92,17 @@ export const useAlarmStore = create<AlarmState>()(
         get().syncWithAndroid();
       },
 
-      removeAlarm: (id) => {
-        // Vi tvinger Android til at slette netop denne alarm først!
-        NyviaRiseModule.cancelAlarm(id);
+      updateAlarm: (id, updatedData) => {
+        set((state) => ({
+          alarms: state.alarms.map((a) =>
+            a.id === id ? { ...a, ...updatedData } : a,
+          ),
+        }));
+        get().syncWithAndroid();
+      },
 
+      removeAlarm: (id) => {
+        NyviaRiseModule.cancelAlarm(id);
         set((state) => ({ alarms: state.alarms.filter((a) => a.id !== id) }));
         get().syncWithAndroid();
       },
@@ -117,35 +122,35 @@ export const useAlarmStore = create<AlarmState>()(
       },
 
       handleAlarmDismissed: () => {
-        const { alarms, toggleAlarm, syncWithAndroid } = get();
-        const activeAlarms = alarms
-          .filter((a) => a.isActive)
-          .sort((a, b) => a.time - b.time);
+        const { alarms, syncWithAndroid } = get();
+        const now = Date.now();
 
-        if (activeAlarms.length > 0) {
-          const ringingAlarm = activeAlarms[0];
+        let hasChanges = false;
 
-          if (ringingAlarm.days.length > 0) {
-            const baseDate = new Date();
-            baseDate.setHours(
-              new Date(ringingAlarm.time).getHours(),
-              new Date(ringingAlarm.time).getMinutes(),
-              0,
-              0,
-            );
-            const nextTime = calculateNextAlarmTime(
-              baseDate,
-              ringingAlarm.days,
-            );
+        const updatedAlarms = alarms.map((alarm) => {
+          // Fanger alle alarmer, hvor tidsstemplet reelt er overskredet
+          if (alarm.isActive && alarm.time <= now) {
+            hasChanges = true;
 
-            set((state) => ({
-              alarms: state.alarms.map((a) =>
-                a.id === ringingAlarm.id ? { ...a, time: nextTime } : a,
-              ),
-            }));
-          } else {
-            toggleAlarm(ringingAlarm.id);
+            if (alarm.days.length > 0) {
+              const baseDate = new Date();
+              baseDate.setHours(
+                new Date(alarm.time).getHours(),
+                new Date(alarm.time).getMinutes(),
+                0,
+                0,
+              );
+              const nextTime = calculateNextAlarmTime(baseDate, alarm.days);
+              return { ...alarm, time: nextTime };
+            } else {
+              return { ...alarm, isActive: false };
+            }
           }
+          return alarm;
+        });
+
+        if (hasChanges) {
+          set({ alarms: updatedAlarms });
           syncWithAndroid();
         }
       },
