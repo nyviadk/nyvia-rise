@@ -7,6 +7,7 @@ import {
   Platform,
   ScrollView,
   Share,
+  StatusBar,
   StyleSheet,
   Switch,
   TextInput,
@@ -183,13 +184,23 @@ export default function HomeScreen() {
     });
   };
 
-  const handleToggleAlarm = (id: string, currentlyActive: boolean) => {
-    toggleAlarm(id);
-    Toast.show({
-      type: currentlyActive ? "info" : "success",
-      text1: currentlyActive ? "Alarm slået fra 😴" : "Alarm aktiveret ⏰",
-      position: "bottom",
-    });
+  const handleToggleAlarm = (alarm: Alarm) => {
+    toggleAlarm(alarm.id);
+
+    if (!alarm.isActive) {
+      // Alarmen bliver slået TIL
+      Toast.show({
+        type: "success",
+        text1: "Alarm aktiveret ⏰",
+        text2: `Planlagt til om ${getTimeRemainingText(alarm.time)}`,
+      });
+    } else {
+      // Alarmen bliver slået FRA
+      Toast.show({
+        type: "info",
+        text1: "Alarm slået fra 😴",
+      });
+    }
   };
 
   const handleDeleteAlarm = (id: string) => {
@@ -197,7 +208,6 @@ export default function HomeScreen() {
     Toast.show({
       type: "error",
       text1: "Alarm slettet 🗑️",
-      position: "bottom",
     });
   };
 
@@ -266,6 +276,9 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F7F9FC" }}>
+      {/* Sikrer at ikoner i statusbaren er sorte/mørke */}
+      <StatusBar barStyle="dark-content" backgroundColor="#F7F9FC" />
+
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <ThemedView style={styles.container}>
           <ThemedText type="title" style={styles.titleSpacing}>
@@ -366,9 +379,7 @@ export default function HomeScreen() {
                   <View style={styles.alarmActions}>
                     <Switch
                       value={alarm.isActive}
-                      onValueChange={() =>
-                        handleToggleAlarm(alarm.id, alarm.isActive)
-                      }
+                      onValueChange={() => handleToggleAlarm(alarm)}
                       trackColor={{ false: "#ccc", true: "#4CAF50" }}
                     />
                     <TouchableOpacity
@@ -501,7 +512,7 @@ export default function HomeScreen() {
                 setShowTimePicker(true);
               }}
             >
-              <ThemedText style={styles.hugeTimeText}>
+              <ThemedText type="subtitle">
                 {pendingTime
                   ? pendingTime.toLocaleTimeString("da-DK", {
                       hour: "2-digit",
@@ -586,7 +597,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  scrollContainer: { flexGrow: 1, paddingBottom: 100 },
+  scrollContainer: { flexGrow: 1, paddingBottom: 130 },
   container: {
     flex: 1,
     padding: 20,
@@ -779,7 +790,7 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: 25,
-    bottom: 30,
+    bottom: 80,
     width: 66,
     height: 66,
     borderRadius: 33,
@@ -833,11 +844,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#F7F9FC",
     borderRadius: 15,
     marginBottom: 25,
-  },
-  hugeTimeText: {
-    fontSize: 48,
-    fontWeight: "bold",
-    color: "#333",
-    letterSpacing: 2,
   },
 });
