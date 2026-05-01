@@ -269,7 +269,7 @@ export default function HomeScreen() {
               secretQrCodes.map((code) => (
                 <View key={code} style={styles.codeItem}>
                   <ThemedText style={{ flex: 1 }} numberOfLines={1}>
-                    *{code.slice(-6)}
+                    {code}
                   </ThemedText>
                   <Button
                     title="Fjern"
