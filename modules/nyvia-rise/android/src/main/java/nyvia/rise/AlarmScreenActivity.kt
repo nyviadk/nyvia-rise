@@ -1,6 +1,8 @@
 package nyvia.rise.module
 
 import android.app.Activity
+import android.app.KeyguardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Build
@@ -15,24 +17,27 @@ class AlarmScreenActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1. Den magiske kode, der smadrer igennem låseskærmen og tænder lyset!
+        // Konfiguration af vindue til at bryde låsen
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+            keyguardManager.requestDismissKeyguard(this, null)
         } else {
             @Suppress("DEPRECATION")
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
         }
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // 2. Vi bygger en lynhurtig, simpel brugergrænseflade direkte i koden
+        // UI opbygning
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(Color.parseColor("#121212")) // Mørk baggrund
+            setBackgroundColor(Color.parseColor("#121212"))
             setPadding(50, 50, 50, 50)
         }
 
@@ -41,15 +46,7 @@ class AlarmScreenActivity : Activity() {
             textSize = 32f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 60)
-        }
-
-        val subtitle = TextView(this).apply {
-            text = "Tid til at vågne!\nMusikken stopper først, når du scanner din kode."
-            textSize = 18f
-            setTextColor(Color.parseColor("#AAAAAA"))
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 100)
+            setPadding(0, 0, 0, 40)
         }
 
         val scanButton = Button(this).apply {
@@ -58,24 +55,17 @@ class AlarmScreenActivity : Activity() {
             setBackgroundColor(Color.parseColor("#4CAF50"))
             setTextColor(Color.WHITE)
             setPadding(40, 40, 40, 40)
-            
-            // 3. Når du trykker på knappen, kaster vi dig ind i React Native appen
             setOnClickListener {
                 val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 }
-                if (launchIntent != null) {
-                    startActivity(launchIntent)
-                }
-                // Luk denne låseskærm (men lyden spiller videre fra Servicen!)
-                finish() 
+                if (launchIntent != null) startActivity(launchIntent)
+                finish()
             }
         }
 
         layout.addView(title)
-        layout.addView(subtitle)
         layout.addView(scanButton)
-
         setContentView(layout)
     }
 }

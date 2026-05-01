@@ -17,26 +17,23 @@ import android.util.Log
 
 class AlarmService : Service() {
     companion object {
-        // Denne variabel lader appen vide, om alarmen larmer lige nu!
         var isRinging = false
     }
 
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
-    
-    // Variabler til fade-in logik (30 sekunder)
     private val handler = Handler(Looper.getMainLooper())
     private var volume = 0.01f
     private val maxVolume = 1.0f
-    private val fadeDuration = 30000L // 30 sekunder
-    private val fadeInterval = 500L // Opdaterer hvert halve sekund (500 ms)
+    private val fadeDuration = 30000L
+    private val fadeInterval = 500L
     private val volumeStep = maxVolume / (fadeDuration / fadeInterval)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         isRinging = true
-        Log.d("NyviaRise", "AlarmService startet - sætter isRinging = true")
+        Log.d("NyviaRise", "AlarmService startet")
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
@@ -45,27 +42,30 @@ class AlarmService : Service() {
             PowerManager.ON_AFTER_RELEASE,
             "NyviaRise::WakeLock"
         )
-        wakeLock?.acquire(10 * 60 * 1000L) // Hold skærmen vågen i op til 10 min
+        wakeLock?.acquire(10 * 60 * 1000L)
 
         createNotificationChannel()
 
-        // --- NYT: Peger nu direkte på vores lynhurtige Native Activity ---
         val fullScreenIntent = Intent(this, AlarmScreenActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or 
+                     Intent.FLAG_ACTIVITY_CLEAR_TOP or 
+                     Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
 
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, fullScreenIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            this, 0, fullScreenIntent, 
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val notification = NotificationCompat.Builder(this, "nyviarise_alarm_channel")
-            .setContentTitle("NyviaRise Alarm 🌅")
+            .setContentTitle("NyviaRise alarm 🌅")
             .setContentText("Tryk for at åbne scanneren!")
             .setSmallIcon(applicationInfo.icon)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setFullScreenIntent(pendingIntent, true) // Her bruger vi vores native skærm!
+            .setFullScreenIntent(pendingIntent, true)
             .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
 
         if (Build.VERSION.SDK_INT >= 34) {
@@ -74,7 +74,13 @@ class AlarmService : Service() {
             startForeground(1, notification)
         }
 
-        // Opsætning af MediaPlayer med fade-in
+        // BACKUP: Forsøg at starte skærmen direkte med det samme
+        try {
+            startActivity(fullScreenIntent)
+        } catch (e: Exception) {
+            Log.e("NyviaRise", "Kunne ikke starte activity direkte: ${e.message}")
+        }
+
         val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
         mediaPlayer = MediaPlayer().apply {
             setDataSource(this@AlarmService, alarmUri)
@@ -85,13 +91,12 @@ class AlarmService : Service() {
                     .build()
             )
             isLooping = true
-            setVolume(volume, volume) // Start meget lavt
+            setVolume(volume, volume)
             prepare()
             start()
         }
 
         startFadeIn()
-
         return START_STICKY
     }
 
@@ -102,9 +107,9 @@ class AlarmService : Service() {
                     volume += volumeStep
                     if (volume < maxVolume) {
                         mediaPlayer?.setVolume(volume, volume)
-                        handler.postDelayed(this, fadeInterval) // Kør igen om 500ms
+                        handler.postDelayed(this, fadeInterval)
                     } else {
-                        mediaPlayer?.setVolume(maxVolume, maxVolume) // Sikkerhedsnet: sæt til 100%
+                        mediaPlayer?.setVolume(maxVolume, maxVolume)
                     }
                 }
             }
@@ -113,27 +118,23 @@ class AlarmService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d("NyviaRise", "AlarmService dør - slukker musik og rydder op")
         isRinging = false
-        
-        // Stop fade-in loopet, så vi ikke får memory leaks
         handler.removeCallbacksAndMessages(null)
-        
         mediaPlayer?.stop()
         mediaPlayer?.release()
-        wakeLock?.let {
-            if (it.isHeld) it.release()
-        }
+        wakeLock?.let { if (it.isHeld) it.release() }
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 "nyviarise_alarm_channel",
-                "NyviaRise Alarm",
+                "Vigtige alarmer",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                setBypassDnd(true) // Ignorer Forstyr Ikke
+                description = "Brugt til at vække dig om morgenen"
+                setBypassDnd(true)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)

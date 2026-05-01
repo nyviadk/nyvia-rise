@@ -1,26 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Kritiske tilladelser til en 110% pålidelig alarm -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    
-    <!-- NYT: Android 14+ kræver denne specifikke FGS tilladelse -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application>
-        <!-- Vores Alarm Service. Opdateret til "specialUse" + Android 14 property -->
         <service
             android:name=".AlarmService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse">
-            <!-- NYT: Dette er et KRAV for Android 14+, når man bruger specialUse -->
             <property 
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" 
                 android:value="anti_snooze_alarm_service" />
@@ -38,15 +32,19 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 
-        <!-- NYT: Vores lynhurtige Native Activity til Låseskærmen -->
+        <!-- Aggressive indstillinger for låseskærms-aktivitet -->
         <activity
             android:name=".AlarmScreenActivity"
             android:showOnLockScreen="true"
+            android:showForAllUsers="true"
+            android:turnScreenOn="true"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
             android:exported="false"
             android:theme="@android:style/Theme.NoTitleBar.Fullscreen" />
+            
     </application>
 </manifest>
