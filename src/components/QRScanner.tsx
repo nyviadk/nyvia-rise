@@ -1,18 +1,18 @@
-import React, { useState, useRef, useEffect } from "react";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { useAlarmStore } from "@/src/store/useAlarmStore";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  StyleSheet,
-  View,
-  Pressable,
-  Text,
   Animated,
+  Pressable,
+  StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
+  View,
 } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
 import Toast from "react-native-toast-message";
-import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
-import { useAlarmStore } from "@/src/store/useAlarmStore";
 
 interface QRScannerProps {
   mode: "scan" | "pair";
@@ -56,7 +56,7 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
   const [cb3, setCb3] = useState(false);
   const [tapCount, setTapCount] = useState(0);
   const tapsRequired = 15;
-  const tapResetTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const tapResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
 
