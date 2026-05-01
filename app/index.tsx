@@ -246,6 +246,8 @@ export default function HomeScreen() {
         text2: "Appen blev lukket ned. Ingen ny alarm sat.",
       });
     }
+
+    // Lukker scanneren
     setScannerMode("none");
   };
 
@@ -258,217 +260,223 @@ export default function HomeScreen() {
     }
   };
 
-  if (scannerMode !== "none") {
-    return (
-      <>
-        <QRScanner
-          mode={scannerMode}
-          onSuccess={stopAlarm}
-          onCancel={() => setScannerMode("none")}
-        />
-        <Toast />
-      </>
-    );
-  }
-
   const dayNames = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"];
   const displayAlarms = alarms.filter((a) => !a.id.startsWith("snooze-"));
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F7F9FC" }}>
-      {/* Sikrer at ikoner i statusbaren er sorte/mørke */}
-      <StatusBar barStyle="dark-content" backgroundColor="#F7F9FC" />
+      {scannerMode !== "none" ? (
+        // --- SCANNER VISNING ---
+        <QRScanner
+          mode={scannerMode}
+          onSuccess={stopAlarm}
+          onCancel={() => setScannerMode("none")}
+        />
+      ) : (
+        // --- HOVEDMENU VISNING ---
+        <>
+          {/* Sikrer at ikoner i statusbaren er sorte/mørke */}
+          <StatusBar barStyle="dark-content" backgroundColor="#F7F9FC" />
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <ThemedView style={styles.container}>
-          <ThemedText type="title" style={styles.titleSpacing}>
-            NyviaRise 🌅
-          </ThemedText>
-
-          <View style={styles.card}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>
-              Godkendte stregkoder
-            </ThemedText>
-            {secretQrCodes.length === 0 ? (
-              <ThemedText style={{ color: "#F44336", marginTop: 5 }}>
-                ⚠️ Ingen stregkode parret!
+          <ScrollView contentContainerStyle={styles.scrollContainer}>
+            <ThemedView style={styles.container}>
+              <ThemedText type="title" style={styles.titleSpacing}>
+                NyviaRise 🌅
               </ThemedText>
-            ) : (
-              secretQrCodes.map((item: any) => {
-                const codeString = typeof item === "string" ? item : item.code;
-                const codeName =
-                  typeof item === "string" ? "Ukendt lokation" : item.name;
-                const idToRemove = typeof item === "string" ? item : item.id;
 
-                return (
-                  <View key={idToRemove} style={styles.codeItem}>
-                    <View style={{ flex: 1 }}>
-                      <ThemedText style={{ fontWeight: "bold" }}>
-                        {codeName}
-                      </ThemedText>
-                      <ThemedText
-                        style={{ fontSize: 12, color: "#666" }}
-                        numberOfLines={1}
-                      >
-                        {codeString}
-                      </ThemedText>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.deleteButtonSmall}
-                      onPress={() => removeSecretQrCode(idToRemove)}
-                    >
-                      <ThemedText style={styles.deleteButtonText}>
-                        Fjern
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })
-            )}
-            <TouchableOpacity
-              style={[styles.primaryButton, { marginTop: 15 }]}
-              onPress={() => setScannerMode("pair")}
-            >
-              <ThemedText style={styles.primaryButtonText}>
-                + Tilføj ny stregkode
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
+              <View style={styles.card}>
+                <ThemedText type="subtitle" style={styles.cardTitle}>
+                  Godkendte stregkoder
+                </ThemedText>
+                {secretQrCodes.length === 0 ? (
+                  <ThemedText style={{ color: "#F44336", marginTop: 5 }}>
+                    ⚠️ Ingen stregkode parret!
+                  </ThemedText>
+                ) : (
+                  secretQrCodes.map((item: any) => {
+                    const codeString =
+                      typeof item === "string" ? item : item.code;
+                    const codeName =
+                      typeof item === "string" ? "Ukendt lokation" : item.name;
+                    const idToRemove =
+                      typeof item === "string" ? item : item.id;
 
-          <View style={styles.card}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>
-              Dine alarmer
-            </ThemedText>
-            {displayAlarms.length === 0 ? (
-              <ThemedText style={{ color: "#999", marginTop: 5 }}>
-                Ingen alarmer sat op endnu. Tryk på plusset for at starte.
-              </ThemedText>
-            ) : (
-              displayAlarms.map((alarm) => (
-                <View key={alarm.id} style={styles.alarmItem}>
-                  <TouchableOpacity
-                    style={{ flex: 1 }}
-                    onPress={() => openEditAlarm(alarm)}
-                    activeOpacity={0.6}
-                  >
-                    <ThemedText style={styles.alarmTimeText}>
-                      {new Date(alarm.time).toLocaleTimeString("da-DK", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </ThemedText>
-                    {alarm.specificDate ? (
-                      <ThemedText style={styles.alarmSubText}>
-                        Dato:{" "}
-                        {new Date(alarm.specificDate).toLocaleDateString(
-                          "da-DK",
-                        )}
-                      </ThemedText>
-                    ) : alarm.days.length > 0 ? (
-                      <ThemedText style={styles.alarmSubText}>
-                        Gentages:{" "}
-                        {alarm.days.map((d) => dayNames[d]).join(", ")}
-                      </ThemedText>
-                    ) : (
-                      <ThemedText style={styles.alarmSubText}>
-                        Engangsalarm (tryk for at tilføje dage)
-                      </ThemedText>
-                    )}
-                  </TouchableOpacity>
-
-                  <View style={styles.alarmActions}>
-                    <Switch
-                      value={alarm.isActive}
-                      onValueChange={() => handleToggleAlarm(alarm)}
-                      trackColor={{ false: "#ccc", true: "#4CAF50" }}
-                    />
-                    <TouchableOpacity
-                      onPress={() => handleDeleteAlarm(alarm.id)}
-                    >
-                      <ThemedText style={{ fontSize: 20 }}>🗑️</ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))
-            )}
-          </View>
-
-          <View style={styles.developerSection}>
-            <ThemedText style={styles.devTitle}>Udvikler værktøj</ThemedText>
-            <TouchableOpacity
-              style={styles.dangerButton}
-              onPress={() => {
-                NyviaRiseModule.testAlarm();
-                setScannerMode("scan");
-              }}
-            >
-              <ThemedText style={styles.dangerButtonText}>
-                🔊 Test alarm nu
-              </ThemedText>
-            </TouchableOpacity>
-
-            <View style={styles.backupContainer}>
-              <TouchableOpacity
-                onPress={async () => {
-                  try {
-                    await Share.share({ message: JSON.stringify(alarms) });
-                  } catch (e) {}
-                }}
-              >
-                <ThemedText style={styles.textLink}>Eksportér</ThemedText>
-              </TouchableOpacity>
-              <ThemedText style={{ color: "#ccc" }}>|</ThemedText>
-              <TouchableOpacity onPress={() => setShowImport(!showImport)}>
-                <ThemedText style={styles.textLink}>Importér</ThemedText>
-              </TouchableOpacity>
-            </View>
-
-            {showImport && (
-              <View style={styles.importBox}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Indsæt JSON backup her..."
-                  placeholderTextColor="#999"
-                  value={importText}
-                  onChangeText={setImportText}
-                  multiline
-                />
+                    return (
+                      <View key={idToRemove} style={styles.codeItem}>
+                        <View style={{ flex: 1 }}>
+                          <ThemedText style={{ fontWeight: "bold" }}>
+                            {codeName}
+                          </ThemedText>
+                          <ThemedText
+                            style={{ fontSize: 12, color: "#666" }}
+                            numberOfLines={1}
+                          >
+                            {codeString}
+                          </ThemedText>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.deleteButtonSmall}
+                          onPress={() => removeSecretQrCode(idToRemove)}
+                        >
+                          <ThemedText style={styles.deleteButtonText}>
+                            Fjern
+                          </ThemedText>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })
+                )}
                 <TouchableOpacity
-                  style={styles.secondaryButton}
-                  onPress={() => {
-                    try {
-                      const parsed = JSON.parse(importText);
-                      if (Array.isArray(parsed)) {
-                        importAlarms(parsed);
-                        Toast.show({
-                          type: "success",
-                          text1: "Alarmer importeret!",
-                        });
-                        setShowImport(false);
-                        setImportText("");
-                      }
-                    } catch (e) {
-                      Toast.show({ type: "error", text1: "Ugyldigt format!" });
-                    }
-                  }}
+                  style={[styles.primaryButton, { marginTop: 15 }]}
+                  onPress={() => setScannerMode("pair")}
                 >
-                  <ThemedText style={styles.secondaryButtonText}>
-                    Gennemfør import
+                  <ThemedText style={styles.primaryButtonText}>
+                    + Tilføj ny stregkode
                   </ThemedText>
                 </TouchableOpacity>
               </View>
-            )}
-          </View>
-        </ThemedView>
-      </ScrollView>
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleFabPress}
-        activeOpacity={0.8}
-      >
-        <ThemedText style={styles.fabText}>+</ThemedText>
-      </TouchableOpacity>
+              <View style={styles.card}>
+                <ThemedText type="subtitle" style={styles.cardTitle}>
+                  Dine alarmer
+                </ThemedText>
+                {displayAlarms.length === 0 ? (
+                  <ThemedText style={{ color: "#999", marginTop: 5 }}>
+                    Ingen alarmer sat op endnu. Tryk på plusset for at starte.
+                  </ThemedText>
+                ) : (
+                  displayAlarms.map((alarm) => (
+                    <View key={alarm.id} style={styles.alarmItem}>
+                      <TouchableOpacity
+                        style={{ flex: 1 }}
+                        onPress={() => openEditAlarm(alarm)}
+                        activeOpacity={0.6}
+                      >
+                        <ThemedText style={styles.alarmTimeText}>
+                          {new Date(alarm.time).toLocaleTimeString("da-DK", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </ThemedText>
+                        {alarm.specificDate ? (
+                          <ThemedText style={styles.alarmSubText}>
+                            Dato:{" "}
+                            {new Date(alarm.specificDate).toLocaleDateString(
+                              "da-DK",
+                            )}
+                          </ThemedText>
+                        ) : alarm.days.length > 0 ? (
+                          <ThemedText style={styles.alarmSubText}>
+                            Gentages:{" "}
+                            {alarm.days.map((d) => dayNames[d]).join(", ")}
+                          </ThemedText>
+                        ) : (
+                          <ThemedText style={styles.alarmSubText}>
+                            Engangsalarm (tryk for at tilføje dage)
+                          </ThemedText>
+                        )}
+                      </TouchableOpacity>
+
+                      <View style={styles.alarmActions}>
+                        <Switch
+                          value={alarm.isActive}
+                          onValueChange={() => handleToggleAlarm(alarm)}
+                          trackColor={{ false: "#ccc", true: "#4CAF50" }}
+                        />
+                        <TouchableOpacity
+                          onPress={() => handleDeleteAlarm(alarm.id)}
+                        >
+                          <ThemedText style={{ fontSize: 20 }}>🗑️</ThemedText>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
+
+              <View style={styles.developerSection}>
+                <ThemedText style={styles.devTitle}>
+                  Udvikler værktøj
+                </ThemedText>
+                <TouchableOpacity
+                  style={styles.dangerButton}
+                  onPress={() => {
+                    NyviaRiseModule.testAlarm();
+                    setScannerMode("scan");
+                  }}
+                >
+                  <ThemedText style={styles.dangerButtonText}>
+                    🔊 Test alarm nu
+                  </ThemedText>
+                </TouchableOpacity>
+
+                <View style={styles.backupContainer}>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      try {
+                        await Share.share({ message: JSON.stringify(alarms) });
+                      } catch (e) {}
+                    }}
+                  >
+                    <ThemedText style={styles.textLink}>Eksportér</ThemedText>
+                  </TouchableOpacity>
+                  <ThemedText style={{ color: "#ccc" }}>|</ThemedText>
+                  <TouchableOpacity onPress={() => setShowImport(!showImport)}>
+                    <ThemedText style={styles.textLink}>Importér</ThemedText>
+                  </TouchableOpacity>
+                </View>
+
+                {showImport && (
+                  <View style={styles.importBox}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Indsæt JSON backup her..."
+                      placeholderTextColor="#999"
+                      value={importText}
+                      onChangeText={setImportText}
+                      multiline
+                    />
+                    <TouchableOpacity
+                      style={styles.secondaryButton}
+                      onPress={() => {
+                        try {
+                          const parsed = JSON.parse(importText);
+                          if (Array.isArray(parsed)) {
+                            importAlarms(parsed);
+                            Toast.show({
+                              type: "success",
+                              text1: "Alarmer importeret!",
+                            });
+                            setShowImport(false);
+                            setImportText("");
+                          }
+                        } catch (e) {
+                          Toast.show({
+                            type: "error",
+                            text1: "Ugyldigt format!",
+                          });
+                        }
+                      }}
+                    >
+                      <ThemedText style={styles.secondaryButtonText}>
+                        Gennemfør import
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </ThemedView>
+          </ScrollView>
+
+          <TouchableOpacity
+            style={styles.fab}
+            onPress={handleFabPress}
+            activeOpacity={0.8}
+          >
+            <ThemedText style={styles.fabText}>+</ThemedText>
+          </TouchableOpacity>
+        </>
+      )}
 
       {showDatePicker && (
         <DateTimePicker
