@@ -10,7 +10,7 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Clipboard from "expo-clipboard";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AppState,
   Modal,
@@ -298,7 +298,28 @@ export default function HomeScreen() {
   };
 
   const dayNames = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"];
-  const displayAlarms = alarms.filter((a) => !a.id.startsWith("snooze-"));
+
+  // Memoize "i morgen", så vi ikke udregner dato-objektet på hvert eneste render
+  const tomorrow = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, []);
+
+  const displayAlarms = useMemo(() => {
+    return alarms
+      .filter((a) => !a.id.startsWith("snooze-"))
+      .sort((a, b) => {
+        const dateA = new Date(a.time);
+        const dateB = new Date(b.time);
+
+        const minutesA = dateA.getHours() * 60 + dateA.getMinutes();
+        const minutesB = dateB.getHours() * 60 + dateB.getMinutes();
+
+        return minutesA - minutesB;
+      });
+  }, [alarms]);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F7F9FC" }}>
@@ -480,9 +501,10 @@ export default function HomeScreen() {
 
       {showDatePicker && (
         <DateTimePicker
-          value={specificDate || new Date()}
+          value={specificDate || tomorrow}
           mode="date"
           display="default"
+          minimumDate={tomorrow} // Sikrer at man ikke kan vælge i dag eller fortiden
           onChange={handleDateSelected}
         />
       )}
