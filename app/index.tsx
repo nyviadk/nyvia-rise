@@ -9,6 +9,7 @@ import {
 } from "@/src/utils/time-helpers";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Clipboard from "expo-clipboard";
+import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
 import {
   AppState,
@@ -17,7 +18,6 @@ import {
   Platform,
   ScrollView,
   Share,
-  StatusBar,
   StyleSheet,
   Switch,
   TouchableOpacity,
@@ -313,7 +313,7 @@ export default function HomeScreen() {
         // --- HOVEDMENU VISNING ---
         <>
           {/* Sikrer at ikoner i statusbaren er sorte/mørke */}
-          <StatusBar barStyle="dark-content" backgroundColor="#F7F9FC" />
+          <StatusBar style="dark" />
 
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <ThemedView style={styles.container}>
