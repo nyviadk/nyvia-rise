@@ -1,7 +1,7 @@
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import NyviaRiseModule from "@/modules/nyvia-rise";
-import { QRScanner } from "@/src/components/QRScanner";
+import { formatBarcodeData, QRScanner } from "@/src/components/QRScanner";
 import { Alarm, useAlarmStore } from "@/src/store/useAlarmStore";
 import {
   calculateNextAlarmTime,
@@ -9,7 +9,6 @@ import {
 } from "@/src/utils/time-helpers";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Clipboard from "expo-clipboard";
-import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   AppState,
@@ -333,9 +332,6 @@ export default function HomeScreen() {
       ) : (
         // --- HOVEDMENU VISNING ---
         <>
-          {/* Sikrer at ikoner i statusbaren er sorte/mørke */}
-          <StatusBar style="dark" />
-
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <ThemedView style={styles.container}>
               <ThemedText type="title" style={styles.titleSpacing}>
@@ -369,7 +365,7 @@ export default function HomeScreen() {
                             style={{ fontSize: 12, color: "#666" }}
                             numberOfLines={1}
                           >
-                            {codeString}
+                            {formatBarcodeData(codeString)}
                           </ThemedText>
                         </View>
                         <TouchableOpacity

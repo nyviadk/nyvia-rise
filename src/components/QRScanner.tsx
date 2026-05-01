@@ -21,6 +21,18 @@ interface QRScannerProps {
   onCancel: () => void;
 }
 
+// Hjælpefunktion til at formatere stregkoden, så den bliver lettere at læse for mennesker
+export const formatBarcodeData = (data: string): string => {
+  // Hvis det f.eks. er en standard EAN-13 (13 cifre)
+  if (/^\d{13}$/.test(data)) {
+    return `${data.slice(0, 1)} ${data.slice(1, 7)} ${data.slice(7, 13)}`;
+  }
+
+  // For alle andre koder (bogstaver eller andre længder):
+  // Bryd op i bidder af 4 for generel læsbarhed
+  return data.match(/.{1,4}/g)?.join(" ") || data;
+};
+
 // Custom Checkbox komponent for et lækkert, moderne look uden eksterne libraries
 const CustomCheckbox = ({
   label,
@@ -219,7 +231,8 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
             Appen aflæste følgende kode:
           </ThemedText>
           <ThemedText style={styles.scannedDataText} selectable={true}>
-            {scannedNewCode}
+            {/* Formatér teksten, så det er letlæseligt */}
+            {formatBarcodeData(scannedNewCode)}
           </ThemedText>
         </View>
 
