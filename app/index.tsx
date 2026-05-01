@@ -435,6 +435,7 @@ export default function HomeScreen() {
                       value={importText}
                       onChangeText={setImportText}
                       multiline
+                      showSoftInputOnFocus
                     />
                     <TouchableOpacity
                       style={styles.secondaryButton}
