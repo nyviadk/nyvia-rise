@@ -20,11 +20,18 @@ export interface Alarm {
   specificDate?: string | null;
 }
 
+// NYT: Definerer stregkoder som et objekt, så vi kan gemme navnene
+export interface SecretQrCode {
+  id: string;
+  code: string;
+  name: string;
+}
+
 interface AlarmState {
   alarms: Alarm[];
-  secretQrCodes: string[]; // NYT: Array af godkendte koder
-  addSecretQrCode: (code: string) => void;
-  removeSecretQrCode: (code: string) => void;
+  secretQrCodes: SecretQrCode[];
+  addSecretQrCode: (qrCode: SecretQrCode) => void;
+  removeSecretQrCode: (id: string) => void;
   addAlarm: (alarm: Alarm) => void;
   removeAlarm: (id: string) => void;
   toggleAlarm: (id: string) => void;
@@ -37,18 +44,20 @@ export const useAlarmStore = create<AlarmState>()(
   persist(
     (set, get) => ({
       alarms: [],
-      secretQrCodes: [], // Starter som en tom liste
+      secretQrCodes: [],
 
-      addSecretQrCode: (code) =>
+      addSecretQrCode: (newQrCode) =>
         set((state) => {
-          // Tilføj kun hvis den ikke allerede findes
-          if (state.secretQrCodes.includes(code)) return state;
-          return { secretQrCodes: [...state.secretQrCodes, code] };
+          // Undgå dubletter af selve stregkode-dataen
+          if (state.secretQrCodes.some((qr) => qr.code === newQrCode.code))
+            return state;
+          return { secretQrCodes: [...state.secretQrCodes, newQrCode] };
         }),
 
-      removeSecretQrCode: (code) =>
+      // Nu sletter vi ud fra ID'et
+      removeSecretQrCode: (id) =>
         set((state) => ({
-          secretQrCodes: state.secretQrCodes.filter((c) => c !== code),
+          secretQrCodes: state.secretQrCodes.filter((qr) => qr.id !== id),
         })),
 
       addAlarm: (newAlarm) => {
@@ -82,10 +91,13 @@ export const useAlarmStore = create<AlarmState>()(
         }
 
         set((state) => ({ alarms: [...state.alarms, newAlarm] }));
-        syncWithAndroid();
+        get().syncWithAndroid();
       },
 
       removeAlarm: (id) => {
+        // Vi tvinger Android til at slette netop denne alarm først!
+        NyviaRiseModule.cancelAlarm(id);
+
         set((state) => ({ alarms: state.alarms.filter((a) => a.id !== id) }));
         get().syncWithAndroid();
       },
@@ -145,11 +157,19 @@ export const useAlarmStore = create<AlarmState>()(
           (a) => a.isActive && a.time > now,
         );
 
+        // 1. Vi skyder med spredehagl og aflyser ALLE alarmer i Android.
+        // Det sikrer, at der ikke ligger en gammel "snooze" eller deaktiveret alarm og lurer i baggrunden.
+        alarms.forEach((a) => {
+          NyviaRiseModule.cancelAlarm(a.id);
+        });
+
+        // 2. Vi finder den alarm, der er tættest på at ringe, og beder Android om at fokusere 100% på dén.
         if (activeFutureAlarms.length > 0) {
           activeFutureAlarms.sort((a, b) => a.time - b.time);
-          NyviaRiseModule.scheduleAlarm(activeFutureAlarms[0].time);
-        } else {
-          NyviaRiseModule.scheduleAlarm(0);
+          const nextAlarm = activeFutureAlarms[0];
+
+          // Giver Kotlin både det unikke ID og tidspunktet
+          NyviaRiseModule.scheduleAlarm(nextAlarm.id, nextAlarm.time);
         }
       },
     }),

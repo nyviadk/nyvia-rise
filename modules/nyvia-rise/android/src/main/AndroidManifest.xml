@@ -14,12 +14,17 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application>
-        <!-- Vores Alarm Service. Opdateret til "specialUse" for at matche tilladelsen -->
+        <!-- Vores Alarm Service. Opdateret til "specialUse" + Android 14 property -->
         <service
             android:name=".AlarmService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="specialUse">
+            <!-- NYT: Dette er et KRAV for Android 14+, når man bruger specialUse -->
+            <property 
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" 
+                android:value="anti_snooze_alarm_service" />
+        </service>
 
         <receiver
             android:name=".AlarmReceiver"
@@ -33,6 +38,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
     </application>

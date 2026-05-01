@@ -30,6 +30,12 @@ export const calculateNextAlarmTime = (
       month: specificDate.getMonth(),
       date: specificDate.getDate(),
     });
+
+    // SIKKERHEDSNET: Hvis den valgte dato er i dag, men tiden er passeret,
+    // skubber vi den en dag frem, så alarmen ikke går af øjeblikkeligt.
+    if (isBefore(alarmTime, now)) {
+      alarmTime = addDays(alarmTime, 1);
+    }
   } else if (activeDays.length === 0) {
     // 2b. Engangsalarm (Hverken ugedage eller fast dato valgt)
     if (isBefore(alarmTime, now)) {
@@ -37,7 +43,6 @@ export const calculateNextAlarmTime = (
     }
   } else {
     // 2c. Gentagende alarm (Ugedage)
-    // Hvis tidspunktet allerede er passeret i dag, ELLER hvis i dag ikke er en valgt dag
     if (isBefore(alarmTime, now) || !activeDays.includes(getDay(alarmTime))) {
       alarmTime = addDays(alarmTime, 1);
       // Fortsæt med at lægge en dag til, indtil vi rammer en valgt ugedag
