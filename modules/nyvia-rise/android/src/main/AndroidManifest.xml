@@ -41,5 +41,12 @@
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
+        <!-- NYT: Vores lynhurtige Native Activity til Låseskærmen -->
+        <activity
+            android:name=".AlarmScreenActivity"
+            android:showOnLockScreen="true"
+            android:exported="false"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen" />
     </application>
 </manifest>

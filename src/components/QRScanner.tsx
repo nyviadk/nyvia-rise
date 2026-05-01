@@ -74,13 +74,16 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
   useEffect(() => {
     Animated.timing(progressAnim, {
       toValue: tapCount / tapsRequired,
-      duration: 150, // Lidt blødere animation
+      duration: 100, // Lidt hurtigere så den føles snappy
       useNativeDriver: false,
-    }).start(({ finished }) => {
-      if (finished && tapCount >= tapsRequired) {
+    }).start();
+
+    // Vi tjekker Manuelt, at vi er i mål, og giver animationen 150ms til visuelt at ramme 100%, FØR vi skifter skærm
+    if (tapCount >= tapsRequired) {
+      setTimeout(() => {
         executeEmergencyStop();
-      }
-    });
+      }, 150);
+    }
   }, [tapCount]);
 
   const executeEmergencyStop = () => {
@@ -314,11 +317,13 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
           >
             <Animated.View
               style={[
-                StyleSheet.absoluteFill,
                 {
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
                   backgroundColor: progressColor,
                   width: progressWidth,
-                  borderRadius: 15,
                   opacity: 0.4,
                 },
               ]}

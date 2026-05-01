@@ -49,21 +49,22 @@ class AlarmService : Service() {
 
         createNotificationChannel()
 
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        // --- NYT: Peger nu direkte på vores lynhurtige Native Activity ---
+        val fullScreenIntent = Intent(this, AlarmScreenActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
 
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            this, 0, fullScreenIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val notification = NotificationCompat.Builder(this, "nyviarise_alarm_channel")
-            .setContentTitle("Tid til at stå op! 🌅")
-            .setContentText("Scan koden for at slukke alarmen.")
+            .setContentTitle("NyviaRise Alarm 🌅")
+            .setContentText("Tryk for at åbne scanneren!")
             .setSmallIcon(applicationInfo.icon)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setFullScreenIntent(pendingIntent, true) 
+            .setFullScreenIntent(pendingIntent, true) // Her bruger vi vores native skærm!
             .setOngoing(true)
             .build()
 
@@ -71,14 +72,6 @@ class AlarmService : Service() {
             startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
             startForeground(1, notification)
-        }
-
-        if (launchIntent != null) {
-            try {
-                startActivity(launchIntent)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
         }
 
         // Opsætning af MediaPlayer med fade-in
