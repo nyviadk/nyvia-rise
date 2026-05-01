@@ -211,15 +211,25 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
     return (
       <ThemedView style={styles.container}>
         <ThemedText type="title" style={styles.title}>
-          Navngiv Stregkode 🏷️
+          Godkend stregkode 🏷️
         </ThemedText>
+
+        <View style={styles.scannedDataContainer}>
+          <ThemedText style={styles.scannedDataLabel}>
+            Appen aflæste følgende kode:
+          </ThemedText>
+          <ThemedText style={styles.scannedDataText} selectable={true}>
+            {scannedNewCode}
+          </ThemedText>
+        </View>
+
         <ThemedText style={styles.subtitle}>
-          Hvad har du lige scannet?
+          Stemmer det overens? Så giv den et navn:
         </ThemedText>
 
         <TextInput
           style={styles.input}
-          placeholder="F.eks. Badeværelse, Kaffemaskine..."
+          placeholder="F.eks. Tandpasta, Kaffemaskine..."
           placeholderTextColor="#666"
           value={codeName}
           onChangeText={setCodeName}
@@ -230,19 +240,20 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
           <TouchableOpacity
             style={[styles.secondaryButton, { flex: 1 }]}
             onPress={() => {
+              // Nulstiller og tænder kameraet igen
               setScannedNewCode(null);
               setScanned(false);
               setCodeName("");
             }}
           >
-            <Text style={styles.secondaryButtonText}>Annuller</Text>
+            <Text style={styles.secondaryButtonText}>🔄 Prøv igen</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.primaryButton, { flex: 1 }]}
             onPress={handleSaveNewCode}
           >
-            <Text style={styles.primaryButtonText}>Gem Kode</Text>
+            <Text style={styles.primaryButtonText}>💾 Gem kode</Text>
           </TouchableOpacity>
         </View>
       </ThemedView>
@@ -390,6 +401,30 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: "#4CAF50",
     backgroundColor: "#000",
+  },
+
+  scannedDataContainer: {
+    backgroundColor: "#1E1E1E",
+    padding: 15,
+    borderRadius: 12,
+    width: "100%",
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#333",
+    alignItems: "center",
+  },
+  scannedDataLabel: {
+    color: "#888",
+    fontSize: 12,
+    textTransform: "uppercase",
+    marginBottom: 8,
+    fontWeight: "600",
+  },
+  scannedDataText: {
+    color: "#4CAF50", // Grøn så den popper frem
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: 2,
   },
 
   // Checkbox Styles

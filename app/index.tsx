@@ -252,7 +252,7 @@ export default function HomeScreen() {
           {/* Sektion: Godkendte Koder */}
           <View style={styles.card}>
             <ThemedText type="subtitle" style={styles.cardTitle}>
-              Godkendte Stregkoder
+              Godkendte stregkoder
             </ThemedText>
             {secretQrCodes.length === 0 ? (
               <ThemedText style={{ color: "#F44336", marginTop: 5 }}>
@@ -303,7 +303,7 @@ export default function HomeScreen() {
           {/* Sektion: Opret ny alarm */}
           <View style={styles.card}>
             <ThemedText type="subtitle" style={styles.cardTitle}>
-              Opret Ny Alarm
+              Opret ny alarm
             </ThemedText>
 
             <ThemedText style={styles.label}>
@@ -369,7 +369,7 @@ export default function HomeScreen() {
               <ThemedText style={styles.secondaryButtonText}>
                 {pendingTime
                   ? `⏱ ${pendingTime.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}`
-                  : "⏰ Sæt Tid"}
+                  : "⏰ Sæt tid"}
               </ThemedText>
             </TouchableOpacity>
 
@@ -387,7 +387,7 @@ export default function HomeScreen() {
           {/* Sektion: Mine Alarmer */}
           <View style={styles.card}>
             <ThemedText type="subtitle" style={styles.cardTitle}>
-              Dine Alarmer
+              Dine alarmer
             </ThemedText>
             {displayAlarms.length === 0 ? (
               <ThemedText style={{ color: "#999", marginTop: 5 }}>
