@@ -221,7 +221,12 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
   // UI State: Navngivning af ny kode
   if (scannedNewCode) {
     return (
-      <ThemedView style={styles.container}>
+      <ThemedView
+        style={[
+          styles.container,
+          { justifyContent: "flex-start", paddingTop: 100 },
+        ]}
+      >
         <ThemedText type="title" style={styles.title}>
           Godkend stregkode 🏷️
         </ThemedText>
