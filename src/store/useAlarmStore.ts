@@ -108,10 +108,21 @@ export const useAlarmStore = create<AlarmState>()(
       },
 
       toggleAlarm: (id) => {
+        const now = Date.now();
         set((state) => ({
-          alarms: state.alarms.map((a) =>
-            a.id === id ? { ...a, isActive: !a.isActive } : a,
-          ),
+          alarms: state.alarms.map((a) => {
+            if (a.id !== id) return a;
+            const nextActive = !a.isActive;
+            if (nextActive && a.time <= now) {
+              const base = new Date(a.time);
+              const specific = a.specificDate
+                ? new Date(a.specificDate)
+                : null;
+              const newTime = calculateNextAlarmTime(base, a.days, specific);
+              return { ...a, isActive: true, time: newTime };
+            }
+            return { ...a, isActive: nextActive };
+          }),
         }));
         get().syncWithAndroid();
       },
