@@ -182,11 +182,15 @@ export default function HomeScreen() {
     toggleAlarm(alarm.id);
 
     if (!alarm.isActive) {
-      // Alarmen bliver slået TIL
+      // toggleAlarm kan have rullet tiden frem hvis den var i fortiden,
+      // så hent friske data fra storen efter mutation.
+      const updated = useAlarmStore
+        .getState()
+        .alarms.find((a) => a.id === alarm.id);
       Toast.show({
         type: "success",
         text1: "Alarm aktiveret ⏰",
-        text2: `Planlagt til om ${getTimeRemainingText(alarm.time)}`,
+        text2: `Planlagt til om ${getTimeRemainingText(updated?.time ?? alarm.time)}`,
       });
     } else {
       // Alarmen bliver slået FRA
