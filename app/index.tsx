@@ -8,6 +8,7 @@ import {
   getTimeRemainingText,
 } from "@/src/utils/time-helpers";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { isSameDay } from "date-fns";
 import * as Clipboard from "expo-clipboard";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -161,10 +162,15 @@ export default function HomeScreen() {
       specificDate,
     );
 
+    // Var datoen passeret, har calculateNextAlarmTime flyttet alarmen væk fra den.
+    // Så gemmer vi den ikke — ellers hænger en dato i fortiden fast på alarmen.
+    const dateStillApplies =
+      specificDate !== null && isSameDay(new Date(triggerTime), specificDate);
+
     updateAlarm(editingAlarmId, {
       time: triggerTime,
       days: selectedDays,
-      specificDate: specificDate ? specificDate.toISOString() : null,
+      specificDate: dateStillApplies ? specificDate!.toISOString() : null,
       isActive: true,
     });
 

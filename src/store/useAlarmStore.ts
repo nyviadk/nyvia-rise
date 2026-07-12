@@ -1,5 +1,6 @@
 import NyviaRiseModule from "@/modules/nyvia-rise";
 import { calculateNextAlarmTime } from "@/src/utils/time-helpers";
+import { isSameDay } from "date-fns";
 import { createMMKV } from "react-native-mmkv";
 import { create } from "zustand";
 import { createJSONStorage, persist, StateStorage } from "zustand/middleware";
@@ -119,7 +120,18 @@ export const useAlarmStore = create<AlarmState>()(
                 ? new Date(a.specificDate)
                 : null;
               const newTime = calculateNextAlarmTime(base, a.days, specific);
-              return { ...a, isActive: true, time: newTime };
+
+              // Er datoen passeret, har calculateNextAlarmTime flyttet alarmen væk fra den.
+              // Så skal den gamle dato smides væk — ellers viser UI'et en dato i fortiden.
+              const dateIsUsedUp =
+                specific !== null && !isSameDay(new Date(newTime), specific);
+
+              return {
+                ...a,
+                isActive: true,
+                time: newTime,
+                specificDate: dateIsUsedUp ? null : a.specificDate,
+              };
             }
             return { ...a, isActive: nextActive };
           }),
@@ -154,7 +166,9 @@ export const useAlarmStore = create<AlarmState>()(
               const nextTime = calculateNextAlarmTime(baseDate, alarm.days);
               return { ...alarm, time: nextTime };
             } else {
-              return { ...alarm, isActive: false };
+              // Engangsalarm er brugt op. En evt. fast dato er nu fortid, så den
+              // ryger med — ellers hænger den fast på alarmen og blokerer næste toggle.
+              return { ...alarm, isActive: false, specificDate: null };
             }
           }
           return alarm;

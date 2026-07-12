@@ -25,19 +25,24 @@ export const calculateNextAlarmTime = (
 
   if (specificDate) {
     // 2a. Hvis du har valgt en fast dato i kalenderen
-    alarmTime = set(alarmTime, {
+    const datedTime = set(alarmTime, {
       year: specificDate.getFullYear(),
       month: specificDate.getMonth(),
       date: specificDate.getDate(),
     });
 
-    // SIKKERHEDSNET: Hvis den valgte dato er i dag, men tiden er passeret,
-    // skubber vi den en dag frem, så alarmen ikke går af øjeblikkeligt.
-    if (isBefore(alarmTime, now)) {
-      alarmTime = addDays(alarmTime, 1);
+    // Datoen holder kun, hvis den rent faktisk ligger i fremtiden.
+    if (!isBefore(datedTime, now)) {
+      return datedTime.getTime();
     }
-  } else if (activeDays.length === 0) {
-    // 2b. Engangsalarm (Hverken ugedage eller fast dato valgt)
+
+    // Datoen er passeret (f.eks. en gammel alarm, der bliver tændt igen).
+    // Vi falder igennem til logikken herunder, så vi ALDRIG returnerer et
+    // tidspunkt i fortiden — det ville få alarmen til at se aktiv ud uden at ringe.
+  }
+
+  if (activeDays.length === 0) {
+    // 2b. Engangsalarm (Hverken ugedage eller brugbar fast dato)
     if (isBefore(alarmTime, now)) {
       alarmTime = addDays(alarmTime, 1);
     }

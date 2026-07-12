@@ -20,6 +20,7 @@ interface QRScannerProps {
   onSuccess: (method: "scan" | "panic" | "force_quit") => void;
   onCancel: () => void;
 }
+const EMERGENCY_STOP_ENABLED: boolean = false;
 
 // Hjælpefunktion til at formatere stregkoden, så den bliver lettere at læse for mennesker
 export const formatBarcodeData = (data: string): string => {
@@ -296,7 +297,9 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
       <ThemedText type="subtitle" style={styles.subtitle}>
         {mode === "pair"
           ? "Scan den kode du vil tilføje."
-          : "Scan en godkendt kode, ELLER brug nødstop."}
+          : EMERGENCY_STOP_ENABLED
+            ? "Scan en godkendt kode, ELLER brug nødstop."
+            : "Scan en godkendt kode for at slukke alarmen."}
       </ThemedText>
 
       <View style={styles.cameraContainer}>
@@ -310,7 +313,7 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
         />
       </View>
 
-      {mode === "scan" && (
+      {EMERGENCY_STOP_ENABLED && mode === "scan" && (
         <View style={styles.emergencyContainer}>
           <View style={styles.checkboxWrapper}>
             <CustomCheckbox
