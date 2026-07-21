@@ -34,6 +34,61 @@ export const formatBarcodeData = (data: string): string => {
   return data.match(/.{1,4}/g)?.join(" ") || data;
 };
 
+// --- Sætnings-udfordring ved nødstop ---
+// I stedet for en fast liste kombinerer vi tre led, så der bliver flere hundrede
+// forskellige sætninger. Så rammer man næsten aldrig den samme to gange i træk,
+// og man kan ikke lære én sætning udenad og taste den i søvne.
+const CHALLENGE_START = [
+  "Jeg står op",
+  "Nu rejser jeg mig",
+  "Jeg kommer ud af sengen",
+  "Jeg møder den nye dag",
+  "Jeg er helt vågen",
+  "Op af sengen kommer jeg",
+  "Jeg vælger at stå op",
+];
+
+const CHALLENGE_MANNER = [
+  "med det samme",
+  "helt roligt",
+  "med et smil",
+  "uden at klage",
+  "friskt og frejdigt",
+  "med god energi",
+  "her til morgen",
+];
+
+const CHALLENGE_END = [
+  "og snoozer ikke",
+  "og bliver oppe",
+  "for nu er det morgen",
+  "og starter dagen godt",
+  "og er klar til alt",
+  "og lægger mig ikke igen",
+];
+
+const pickRandom = <T,>(arr: T[]): T =>
+  arr[Math.floor(Math.random() * arr.length)];
+
+// Generér en ny sætning; undgå at gentage den forrige.
+export const generateChallengeSentence = (previous?: string | null): string => {
+  let sentence = "";
+  do {
+    sentence = `${pickRandom(CHALLENGE_START)} ${pickRandom(
+      CHALLENGE_MANNER,
+    )} ${pickRandom(CHALLENGE_END)}`;
+  } while (sentence === previous);
+  return sentence;
+};
+
+// Sammenlign tolerant: ignorér store/små bogstaver, tegnsætning og ekstra mellemrum.
+export const normalizeSentence = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[.,!?;:]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
 // Custom Checkbox komponent for et lækkert, moderne look uden eksterne libraries
 const CustomCheckbox = ({
   label,
@@ -71,6 +126,11 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
   const tapsRequired = 15;
   const tapResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Sætnings-udfordring: sidste spærre efter checkboxes + tap.
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [typedSentence, setTypedSentence] = useState("");
+  const lastChallengeRef = useRef<string | null>(null);
+
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   // Vi forventer nu at secretQrCodes er objekter { id, code, name } i storen
@@ -94,16 +154,41 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
     // Vi tjekker Manuelt, at vi er i mål, og giver animationen 150ms til visuelt at ramme 100%, FØR vi skifter skærm
     if (tapCount >= tapsRequired) {
       setTimeout(() => {
-        executeEmergencyStop();
+        startTypeChallenge();
       }, 150);
     }
   }, [tapCount]);
 
-  const executeEmergencyStop = () => {
+  // Tappene er i mål — nu åbner vi den sidste spærre: skriv en tilfældig sætning.
+  const startTypeChallenge = () => {
     if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
     setTapCount(0);
     progressAnim.setValue(0);
 
+    const sentence = generateChallengeSentence(lastChallengeRef.current);
+    lastChallengeRef.current = sentence;
+    setTypedSentence("");
+    setChallenge(sentence);
+  };
+
+  const confirmTypeChallenge = () => {
+    if (!challenge) return;
+
+    if (normalizeSentence(typedSentence) === normalizeSentence(challenge)) {
+      setChallenge(null);
+      setTypedSentence("");
+      executeEmergencyStop();
+    } else {
+      Toast.show({
+        type: "error",
+        text1: "Ikke helt korrekt ✍️",
+        text2: "Skriv sætningen præcis som den står.",
+        position: "bottom",
+      });
+    }
+  };
+
+  const executeEmergencyStop = () => {
     setTimeout(() => {
       onSuccess("force_quit"); // Sender besked om at det var et ægte Force Quit!
     }, 0);
@@ -195,6 +280,65 @@ export function QRScanner({ mode, onSuccess, onCancel }: QRScannerProps) {
     });
     onSuccess("scan");
   };
+
+  // UI State: Sidste spærre — skriv den tilfældige sætning for at tvangslukke.
+  if (challenge) {
+    return (
+      <ThemedView
+        style={[
+          styles.container,
+          { justifyContent: "flex-start", paddingTop: 100 },
+        ]}
+      >
+        <ThemedText type="title" style={styles.title}>
+          Sidste skridt ✍️
+        </ThemedText>
+        <ThemedText style={styles.subtitle}>
+          Skriv sætningen præcis som den står, for at slukke helt.
+        </ThemedText>
+
+        <View style={styles.scannedDataContainer}>
+          <ThemedText style={styles.challengeSentence} selectable={false}>
+            {challenge}
+          </ThemedText>
+        </View>
+
+        <TextInput
+          style={[styles.input, { marginTop: 10 }]}
+          placeholder="Skriv sætningen her..."
+          placeholderTextColor="#666"
+          value={typedSentence}
+          onChangeText={setTypedSentence}
+          autoFocus
+          multiline
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="done"
+          onSubmitEditing={confirmTypeChallenge}
+        />
+
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 20 }}>
+          <TouchableOpacity
+            style={[styles.secondaryButton, { flex: 1 }]}
+            onPress={() => {
+              // Fortryd: tilbage til scanneren uden at slukke.
+              setChallenge(null);
+              setTypedSentence("");
+            }}
+          >
+            <Text style={styles.secondaryButtonText}>← Fortryd</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.primaryButton, { flex: 1 }]}
+            onPress={confirmTypeChallenge}
+          >
+            <Text style={styles.primaryButtonText}>Sluk alarmen</Text>
+          </TouchableOpacity>
+        </View>
+      </ThemedView>
+    );
+  }
 
   if (!permission)
     return (
@@ -446,6 +590,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
     letterSpacing: 2,
+  },
+  challengeSentence: {
+    color: "#4CAF50",
+    fontSize: 20,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: 28,
   },
 
   // Checkbox Styles
