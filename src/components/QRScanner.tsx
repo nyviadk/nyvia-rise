@@ -20,7 +20,7 @@ interface QRScannerProps {
   onSuccess: (method: "scan" | "panic" | "force_quit") => void;
   onCancel: () => void;
 }
-const EMERGENCY_STOP_ENABLED: boolean = false;
+const EMERGENCY_STOP_ENABLED: boolean = true;
 
 // Hjælpefunktion til at formatere stregkoden, så den bliver lettere at læse for mennesker
 export const formatBarcodeData = (data: string): string => {
